@@ -1,7 +1,10 @@
 package Apache::Htpasswd;
 
-# $Id: Htpasswd.pm,v 1.3 2000/04/04 15:00:15 meltzek Exp meltzek $
+# $Id: Htpasswd.pm,v 1.4 2001/02/23 08:23:46 kevin Exp kevin $
 # $Log: Htpasswd.pm,v $
+
+# Revision 1.4  2001/02/23 08:23:46 kevin
+# Added support for extra info fields
 
 # Revision 1.3  2000/04/04 15:00:15 meltzek
 # Made file locking safer to avoid race conditions. Fixed
@@ -31,11 +34,11 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 @EXPORT = qw();
 
-@EXPORT_OK = qw(htpasswd htDelete fetchPass htCheckPassword error Version);
+@EXPORT_OK = qw(htpasswd htDelete fetchPass fetchInfo writeInfo htCheckPassword error Version);
 
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-($VERSION = substr(q$Revision: 1.3 $, 10)) =~ s/\s+$//;
+($VERSION = substr(q$Revision: 1.4 $, 10)) =~ s/\s+$//;
 
 sub Version {
 	return $VERSION;
@@ -99,61 +102,60 @@ sub htpasswd {
 
 	if (!defined($oldPass)) { $noOld=1;}
 	if (defined($oldPass) && $oldPass =~ /^\d$/) {
-		if ($oldPass == 1) {
+		if ($oldPass) {
 			$newPass = $Id unless $newPass;
 			my ($newEncrypted) = $self->CryptPasswd($newPass);
 			return $self->writePassword($Id, $newEncrypted);
 		}
 	}
 
-# New Entry
-if ($noOld == 1) {
-    my ($passwdFile) = $self->{'PASSWD'};
+	# New Entry
+	if ($noOld) {
+	    my ($passwdFile) = $self->{'PASSWD'};
 
-	# Encrypt new password string
+		# Encrypt new password string
 
-	my ($passwordCrypted) = $self->CryptPasswd($newPass);
+		my ($passwordCrypted) = $self->CryptPasswd($newPass);
 
-    $self->_open();
+    		$self->_open();
 
-	if ($self->fetchPass($Id)) {
+		if ($self->fetchPass($Id)) {
 
-		# User already has a password in the file. 
-		$self->{'ERROR'} = __PACKAGE__. "::htpasswd - $Id already exists in $passwdFile";
-		carp $self->error();
+			# User already has a password in the file. 
+			$self->{'ERROR'} = __PACKAGE__. "::htpasswd - $Id already exists in $passwdFile";
+			carp $self->error();
 
-		$self->_close();  
-		return undef;
-	} else {
-		# If we can add the user.
+			$self->_close();  
+			return undef;
+		} else {
+			# If we can add the user.
 	
-	    seek(FH, 0, SEEK_END);
-	    print FH "$Id\:$passwordCrypted\n";
+	    		seek(FH, 0, SEEK_END);
+	    		print FH "$Id\:$passwordCrypted\n";
 	    
-	    $self->_close();  
-	    return 1;
-	}
+	    		$self->_close();  
+	    		return 1;
+		}
 
-    $self->_close();
+    		$self->_close();
 
-} # end if $noOld == 1
-else {
-    $self->_open();
-
-	my ($exists) = $self->htCheckPassword($Id, $oldPass);
-
-	if ($exists) {
-		my ($newCrypted) = $self->CryptPasswd($newPass);
-		return $self->writePassword($Id, $newCrypted);
 	} else {
-		# ERROR returned from htCheckPass
-		$self->{'ERROR'} = __PACKAGE__."::htpasswd - Password not changed.";
-		carp $self->error();
-		return undef;
-	}
+    		$self->_open();
 
-    $self->_close();
-    }
+		my ($exists) = $self->htCheckPassword($Id, $oldPass);
+
+		if ($exists) {
+			my ($newCrypted) = $self->CryptPasswd($newPass);
+			return $self->writePassword($Id, $newCrypted);
+		} else {
+			# ERROR returned from htCheckPass
+			$self->{'ERROR'} = __PACKAGE__."::htpasswd - Password not changed.";
+			carp $self->error();
+			return undef;
+		}
+
+    		$self->_close();
+    	}
 } # end htpasswd
 
 #-----------------------------------------------------------#
@@ -166,7 +168,6 @@ sub htDelete {
 
 	# Loop through the file, building a cache of exising records
 	# which don't match the Id.
-
 
 	$self->_open();
 
@@ -218,9 +219,9 @@ sub fetchPass {
 	
 	while (<FH>) {
 		chop;
-		if ( /^$Id\:/ ) {
-		    $passwd = $_;
-		    $passwd =~ s/^[^:]*://;    
+		my @tmp = split(/:/,$_,3);
+		if ( $tmp[0] eq $Id ) {
+		    $passwd = $tmp[1];
 		    last;
 		}
 	}
@@ -246,13 +247,15 @@ sub writePassword {
 
 	while (<FH>) {
 
-		if ( /^$Id\:/ ) {
-			push (@cache, "$Id\:$newPass\n");
-			$return = 1; 
+	    my @tmp = split(/:/,$_,3);
+	    if ( $tmp[0] eq $Id ) {
+		my $info = $tmp[2] ? $tmp[2] : "";
+	        push (@cache, "$Id\:$newPass\:$info");
+	        $return = 1; 
 
-		} else {
-			push (@cache, $_);
-		}
+	    } else {
+	        push (@cache, $_);
+	    }
 	}
 
 	# Write out the @cache, if needed.
@@ -281,6 +284,81 @@ sub writePassword {
 
 #-----------------------------------------------------------#
 
+sub fetchInfo {
+	my ($self) = shift;
+	my ($Id) = @_;
+	my ($passwdFile) = $self->{'PASSWD'};
+
+	my $info = 0;
+
+	$self->_open();
+	
+	while (<FH>) {
+		chop;
+		my @tmp = split(/:/,$_,3);
+		if ( $tmp[0] eq $Id ) {
+		    $info = $tmp[2];
+		    last;
+		}
+	}
+
+	$self->_close();
+
+	return $info;
+}
+
+#-----------------------------------------------------------#
+
+sub writeInfo {
+	my ($self) = shift;
+	my ($Id, $newInfo) = @_;
+
+	my ($passwdFile) = $self->{'PASSWD'};
+	my (@cache);
+
+	my ($return);
+	
+	$self->_open();
+	seek(FH, 0, SEEK_SET);
+
+	while (<FH>) {
+
+        my @tmp = split(/:/,$_,3);
+		if ( $tmp[0] eq $Id ) {
+			push (@cache, "$Id\:$tmp[1]\:$newInfo\n");
+			$return = 1; 
+
+		} else {
+			push (@cache, $_);
+		}
+	}
+
+	# Write out the @cache, if needed.
+
+	if ($return) {
+	    
+	    # Return to beginning of file
+	    seek(FH, 0, SEEK_SET);
+
+		while (@cache) { 
+			print FH shift (@cache); 
+		}
+
+	    # Cut everything beyond current position
+	    truncate(FH, tell(FH));
+
+	} else {
+		$self->{'ERROR'} = __PACKAGE__. "::writeInfo - User $Id not found in $passwdFile: $!";
+		carp $self->error() . "\n";
+	}
+
+	$self->_close();
+
+	return $return;
+}
+
+#-----------------------------------------------------------#
+
 sub CryptPasswd {
 	my ($self) = shift;
 	my ($passwd, $salt) = @_;
@@ -297,7 +375,6 @@ sub CryptPasswd {
 
 #-----------------------------------------------------------#
 
-# Always release lock, just to be on the safe side
 sub DESTROY { close(FH); };
 
 #-----------------------------------------------------------#
@@ -405,6 +482,12 @@ Apache::Htpasswd - Manage Unix crypt-style password file.
     # If something fails, check error
     $foo->error;
 
+    # Write in the extra info field
+    $foo->writeInfo("login", "info");
+
+    # Get extra info field for a user
+    $foo->fetchInfo("login");
+
 =head1 DESCRIPTION
 
 This module comes with a set of methods to use with htaccess password
@@ -412,7 +495,8 @@ files. These files (and htaccess) are used to do Basic Authentication
 on a web server.
 
 The passwords file is a flat-file with login name and their associated
-crypted password.
+crypted password. You can use this for non-Apache files if you wish, but
+it was written specifically for .htaccess style files.
 
 =head2 FUNCTIONS
 
@@ -476,6 +560,20 @@ Returns 0 if login is invalid.
 Returns undef otherwise.
 
 
+=item fetchInfo("login");
+
+Returns additional information if succeeds.
+Returns 0 if login is invalid.
+Returns undef otherwise.
+
+
+=item writeInfo("login", "info");
+
+Will replace the additional information for the login.
+Returns 0 if login is invalid.
+Returns undef otherwise.
+
+
 =item CryptPasswd("password", "salt");
 
 Will return an encrypted password using 'crypt'. If I<salt> is
@@ -521,6 +619,9 @@ $Revision: 1.3 $ $Date: 2000/04/04 15:00:13 $
 
 $Log: Htpasswd.pm,v $
 
+Revision 1.4  2001/02/23 08:23:46 kevin
+Added support for extra info fields
+
 Revision 1.3  2000/04/04 15:00:15 meltzek
 Made file locking safer to avoid race conditions. Fixed
 typo in docs.
@@ -540,11 +641,13 @@ None knows at time of writting.
 
 =head1 AUTHOR INFORMATION
 
-Copyright 1998, 1999, 2000, Kevin Meltzer.  All rights reserved.  It may
+Copyright 1998..2001, Kevin Meltzer.  All rights reserved.  It may
 be used and modified freely, but I do request that this copyright
 notice remain attached to the file.  You may modify this module as you
 wish, but if you redistribute a modified version, please attach a note
 listing the modifications you have made.
+
+This is released under the same terms as Perl itself.
 
 Address bug reports and comments to:
 perlguy@perlguy.com

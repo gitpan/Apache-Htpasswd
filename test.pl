@@ -7,7 +7,7 @@
 # Added new checks.
 #
 
-BEGIN { $| = 1; print "Tests 1..8 begining\n"; }
+BEGIN { $| = 1; print "Tests 1..10 begining\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Apache::Htpasswd;
 
@@ -35,16 +35,16 @@ close TEST;
 
 {
 	
-	# 2: open a database
+	# 2: Get file
 	&report_result($pwdFile = new Apache::Htpasswd ($File), $! );
 
 	# 3: store a value
 	&report_result($pwdFile->htpasswd("foo","foobar") , $! );
 
-	# 4: store a new hash 
+	# 4: change value 
 	&report_result($pwdFile->htpasswd("foo", "goo","foobar" ) , $! );
 	
-	# 5: retie the hash
+	# 5: force change value
 	&report_result($pwdFile->htpasswd("foo","ummm",1), $! );
 
 	# 6: check the stored value
@@ -53,8 +53,16 @@ close TEST;
 	# 7: check whether the empty key exists()
 	&report_result($pwdFile->htCheckPassword("foo","ummm"),$!);
 
-	# 8: check whether the empty key exists()
+	# 8: add extra info
+	&report_result($pwdFile->writeInfo("kevin", "Test info"),$!);
+	
+	# 9: fetch extra info
+	&report_result($pwdFile->fetchInfo("kevin"),$!);
+	
+	# 10: Delete user
 	&report_result($pwdFile->htDelete("kevin"),$!);
+	
+	
 	
 }
 
