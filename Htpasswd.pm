@@ -1,7 +1,10 @@
 package Apache::Htpasswd;
 
-# $Id: Htpasswd.pm,v 1.4 2001/02/23 08:23:46 kevin Exp kevin $
+# $Id: Htpasswd.pm,v 1.5 2001/03/15 01:50:12 kevin Exp kevin $
 # $Log: Htpasswd.pm,v $
+
+# Revision 1.5  2001/03/15 01:50:12 kevin
+# Fixed bug to remove newlines
 
 # Revision 1.4  2001/02/23 08:23:46 kevin
 # Added support for extra info fields
@@ -38,7 +41,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-($VERSION = substr(q$Revision: 1.4 $, 10)) =~ s/\s+$//;
+($VERSION = substr(q$Revision: 1.5 $, 10)) =~ s/\s+$//;
 
 sub Version {
 	return $VERSION;
@@ -323,8 +326,10 @@ sub writeInfo {
 
 	while (<FH>) {
 
-        my @tmp = split(/:/,$_,3);
+	        my @tmp = split(/:/,$_,3);
+
 		if ( $tmp[0] eq $Id ) {
+			chomp $tmp[1] if (@tmp == 2); # Cut out EOL if there was no info
 			push (@cache, "$Id\:$tmp[1]\:$newInfo\n");
 			$return = 1; 
 
@@ -618,6 +623,9 @@ $Revision: 1.3 $ $Date: 2000/04/04 15:00:13 $
 =head1 CHANGES
 
 $Log: Htpasswd.pm,v $
+
+Revision 1.5  2001/03/15 01:50:12 kevin
+Fixed bug to remove newlines
 
 Revision 1.4  2001/02/23 08:23:46 kevin
 Added support for extra info fields
