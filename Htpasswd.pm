@@ -1,7 +1,10 @@
 package Apache::Htpasswd;
 
-# $Id: Htpasswd.pm,v 1.5.1 2001/03/26 08:25:38 kevin Exp kevin $
+# $Id: Htpasswd.pm,v 1.5.2 2001/04/03 09:14:57 kevin Exp kevin $
 # $Log: Htpasswd.pm,v $
+
+# Revision 1.5.2  2001/04/03 09:14:57 kevin
+# Really fixed newline problem :)
 
 # Revision 1.5.1  2001/03/26 08:25:38 kevin
 # Fixed another newline problem
@@ -44,7 +47,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-($VERSION = substr(q$Revision: 1.5.1 $, 10)) =~ s/\s+$//;
+($VERSION = substr(q$Revision: 1.5.2 $, 10)) =~ s/\s+$//;
 
 sub Version {
 	return $VERSION;
@@ -255,8 +258,8 @@ sub writePassword {
 
 	    my @tmp = split(/:/,$_,3);
 	    if ( $tmp[0] eq $Id ) {
-		my $info = $tmp[2] ? $tmp[2] : "";
-	        push (@cache, "$Id\:$newPass\:$info\n");
+		my $info = $tmp[2] ? $tmp[2] : "\n";
+	        push (@cache, "$Id\:$newPass\:$info");
 	        $return = 1; 
 
 	    } else {
@@ -621,11 +624,14 @@ site near you.
 
 =head1 VERSION
 
-$Revision: 1.3 $ $Date: 2000/04/04 15:00:13 $
+$Revision: 1.5.2 $ $Date: 2001/04/03 09:14:57 $
 
 =head1 CHANGES
 
 $Log: Htpasswd.pm,v $
+
+Revision 1.5.2  2001/04/03 09:14:57 kevin
+Really fixed newline problem :)
 
 Revision 1.5.1  2001/03/26 08:25:38 kevin
 Fixed another newline problem
