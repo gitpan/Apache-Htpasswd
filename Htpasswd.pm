@@ -2,7 +2,7 @@ package Apache::Htpasswd;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use strict;		# Restrict unsafe variables, references, barewords
-#use Carp;
+use Carp;
 
 @ISA = qw(Exporter);
 
@@ -12,7 +12,7 @@ use strict;		# Restrict unsafe variables, references, barewords
 
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-$VERSION = '0.9';
+$VERSION = '0.9.1';
 
 sub Version {
 return $VERSION;
