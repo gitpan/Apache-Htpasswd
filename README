@@ -13,6 +13,7 @@ by running these commands:
 
    perl Makefile.PL
    make
+   make test
    make install
    make clean
 
@@ -34,9 +35,6 @@ The latest version of Apache::Htpasswd should always be available from:
 Visit <URL:http://www.perl.com/CPAN/> to find a CPAN
 site near you.
 
-CONTACT
-
-You can contact me at kmeltz@cris.com for bug reports, etc..
 
 COPYRIGHT
 

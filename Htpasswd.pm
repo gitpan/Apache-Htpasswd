@@ -1,5 +1,17 @@
 package Apache::Htpasswd;
 
+# $Id: Htpasswd.pm,v 1.1 1998/10/22 03:12:08 kmeltz Exp kmeltz $
+# $Log: Htpasswd.pm,v $
+# Revision 1.1  1998/10/22 03:12:08  kmeltz
+# Slightly changed how files lock.
+# Made more use out of carp and croak.
+# Made sure there were no ^M's as per Randal Schwartz's request.
+#
+# Revision 1.0  1998/10/21 05:53:56  kmeltz
+# First version on CPAN.
+#
+
+
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use strict;		# Restrict unsafe variables, references, barewords
 use Carp;
@@ -12,7 +24,7 @@ use Carp;
 
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-$VERSION = '0.9.1';
+($VERSION = substr(q$Revision: 1.1 $, 10)) =~ s/\s+$//;
 
 sub Version {
 return $VERSION;
@@ -57,7 +69,8 @@ sub htCheckPassword {
 	if ($fooCryptPass eq $cryptPass) {
 		return 1;
 	} else {
-		$self->{'ERROR'} = "Old passwords do not match.\n";
+		$self->{'ERROR'} = "Old passwords do not match. Change not made.";
+		carp $self->error();
 		return 0;
 	}
 }
@@ -93,25 +106,22 @@ if ($noOld == 1) {
 
 		# User already has a password in the file. 
 		$self->{'ERROR'} = "$Id already exists in $passwdFile";
-		print $self->error() . "\n";
+		carp $self->error();
 		return undef;
-	
 	} else {
 		# If we can add the user.
 		if (!open(FH,">>$passwdFile")) {
 			$self->{'ERROR'} = "Cannot append to $passwdFile: $!";
-			print $self->error() . "\n";
-			return undef;
+			croak $self->error();
 		}
 
-		flock(FH, 8);
+		_lock();
 		print FH "$Id\:$passwordCrypted\n";
-		flock(FH, 2);
+		_unlock();
 
 		if (!close(FH)) {
 			$self->{'ERROR'} = "Cannot close $passwdFile: $!";
-			print $self->error() . "\n";
-			return undef;
+			croak $self->error();			
 		}
 	
 		return 1;
@@ -125,7 +135,7 @@ else {
 		return $self->writePassword($Id, $newCrypted);
 	} else {
 		# ERROR returned from htCheckPass
-		print $self->error;
+		carp $self->error();
 		return undef;
 	}
 	
@@ -145,8 +155,7 @@ sub htDelete {
 
 	if (!open(FH,"<$passwdFile")) {
 		$self->{'ERROR'} = "cannot open $passwdFile: $!";
-		print $self->error() . "\n";
-		return undef;
+		croak $self->error();
 	}
 	while (<FH>) {
 
@@ -159,7 +168,7 @@ sub htDelete {
 
 	if (!close(FH)) {
 		$self->{'ERROR'} = "cannot close $passwdFile: $!";
-		print $self->error() . "\n";
+		carp $self->error();
 		return undef;
 	}
 
@@ -169,26 +178,23 @@ sub htDelete {
 
 		if (!open(FH,">$passwdFile")) {
 			$self->{'ERROR'} = "cannot open $passwdFile: $!";
-			print $self->error() . "\n";
-			return undef;
+			croak $self->error();
 		}
 
-		flock(FH, 2) || print "Can't lock file";
-
+		_lock();
 		while (@cache) { 
 			print FH shift (@cache); 
 		}
-
-		flock(FH, 8) || print "Can't unlock file";
+		_unlock();
 
 		if (!close(FH)) {
-			$self->{'ERROR'} = "cannot close $passwdFile: $!";
-			print $self->error() . "\n";
+			$self->{'ERROR'} = "Cannot close $passwdFile: $!";
+			carp $self->error();
 			return undef;
 		}
 	} else {
-		$self->{'ERROR'} = "user $Id no found in $passwdFile: $!";
-		print $self->error() . "\n";
+		$self->{'ERROR'} = "User $Id not found in $passwdFile: $!";
+		carp $self->error();
 	}
 
 	return $return;
@@ -202,17 +208,16 @@ sub fetchPass {
 	my ($passwdFile) = $self->{'PASSWD'};
 
 	if (!open(FH,"<$passwdFile")) {
-		$self->{'ERROR'} = "cannot open $passwdFile: $!";
-		print $self->error() . "\n";
-		return undef;
+		$self->{'ERROR'} = "Cannot open $passwdFile: $!";
+		croak $self->error();
 	}
-
+	
 	while (<FH>) {
 		chop;
 		if ( /^$Id\:/ ) {
 			if (!close(FH)) {
-				$self->{'ERROR'} = "cannot close $passwdFile: $!";
-				print $self->error() . "\n";
+				$self->{'ERROR'} = "Cannot close $passwdFile: $!";
+				carp $self->error();
 				return undef;
 			}
 
@@ -223,11 +228,11 @@ sub fetchPass {
 
 	# Password not found
 	if (!close(FH)) {
-		$self->{'ERROR'} = "cannot close $passwdFile: $!";
-		print $self->error() . "\n";
+		$self->{'ERROR'} = "Cannot close $passwdFile: $!";
+		carp $self->error();
 		return undef;
 	}
-
+	
 	return 0;
 }
 
@@ -244,8 +249,7 @@ sub writePassword {
 
 	if (!open(FH,"<$passwdFile")) {
 		$self->{'ERROR'} = "cannot open $passwdFile: $!";
-		print $self->error() . "\n";
-		return undef;
+		croak $self->error();
 	}
 
 	while (<FH>) {
@@ -261,7 +265,7 @@ sub writePassword {
 
 	if (!close(FH)) {
 		$self->{'ERROR'} = "cannot close $passwdFile: $!";
-		print $self->error() . "\n";
+		carp $self->error();
 		return undef;
 	}
 
@@ -271,26 +275,24 @@ sub writePassword {
 
 		if (!open(FH, ">$passwdFile")) {
 			$self->{'ERROR'} = "cannot open $passwdFile: $!";
-			print $self->error() . "\n";
-			return undef;
+			croak $self->error();
 		}
 
-		flock(FH,2) || croak "Can't lock file";
+		_lock();
 
 		while (@cache) { 
 			print FH shift (@cache); 
 		}
-
-		flock(FH,8) || croak "Can't lock file";
+		_unlock();
 
 		if (!close(FH)) {
-			$self->{'ERROR'} = "cannot close $passwdFile: $!";
-			print $self->error() . "\n";
+			$self->{'ERROR'} = "Cannot close $passwdFile: $!";
+			carp $self->error() . "\n";
 			return undef;
 		}
 	} else {
-		$self->{'ERROR'} = "user $Id not found in $passwdFile: $!";
-		print $self->error() . "\n";
+		$self->{'ERROR'} = "User $Id not found in $passwdFile: $!";
+		carp $self->error() . "\n";
 	}
 
 	return $return;
@@ -315,6 +317,23 @@ sub CryptPasswd {
 #-----------------------------------------------------------#
 
 sub DESTROY {};
+
+#-----------------------------------------------------------#
+
+    sub _lock {
+        flock(FH,2);
+        # and, in case someone appended
+        # while we were waiting...
+        seek(FH, 0, 2);
+    }
+
+#-----------------------------------------------------------#
+
+    sub _unlock {
+        flock(FH,8);
+    }
+
+#-----------------------------------------------------------#
 
 1; 
 
@@ -342,7 +361,7 @@ Apache::Htpasswd - Manage Unix crypt-style password file.
     $foo->htpasswd("zog", "new-password", 1);
         
     # Check that a password is correct
-    $pwdFile->htCheckPass("zog", "password");
+    $pwdFile->htCheckPassord("zog", "password");
 
     # Fetch an encrypted password 
     $foo->fetchPass("foo");
@@ -439,6 +458,7 @@ by running these commands:
 
    perl Makefile.PL
    make
+   make test
    make install
    make clean
 
@@ -460,6 +480,17 @@ The latest version of Apache::Htpasswd should always be available from:
 Visit <URL:http://www.perl.com/CPAN/> to find a CPAN
 site near you.
 
+=head1 VERSION
+
+$Revision: 1.1 $ $Date: 1998/10/22 03:12:08 $
+
+=head1 CHANGES
+
+$Log: Htpasswd.pm,v $
+Revision 1.1  1998/10/22 03:12:08  meltzek
+Slightly changed how files lock.
+Made more use out of carp and croak.
+Made sure there were no ^M's as per Randal Schwartz's request.
 
 
 =head1 BUGS
