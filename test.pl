@@ -45,6 +45,7 @@ close TEST;
 	&report_result($pwdFile->htpasswd("foo","foobar") , $! );
 
 	# 4: change value 
+	&report_result(!$pwdFile->htpasswd("fooo", "goo","foobar" ) , $! );
 	&report_result($pwdFile->htpasswd("foo", "goo","foobar" ) , $! );
 	
 	# 5: force change value

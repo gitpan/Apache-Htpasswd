@@ -16,7 +16,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = ( all => [@EXPORT_OK] );
 
-$VERSION = '1.5.7';
+$VERSION = '1.5.8';
 
 sub Version {
     return $VERSION;
@@ -66,7 +66,6 @@ sub htCheckPassword {
     my $pass = shift;
 
     my $cryptPass = $self->fetchPass($Id);
-
     if ( !$cryptPass ) { return undef; }
 
     my $fooCryptPass = $self->CryptPasswd( $pass, $cryptPass );
@@ -88,7 +87,7 @@ sub htpasswd {
     my $self    = shift;
     my $Id      = shift;
     my $newPass = shift;
-    my $oldPass = @_ if @_;
+    my $oldPass = shift; 
     my $noOld = 0;
 
     if ( $self->{READONLY} ) {
@@ -713,6 +712,12 @@ Visit <URL:http://www.perl.com/CPAN/> to find a CPAN
 site near you.
 
 =head1 CHANGES
+
+Revision 1.5.8  Bugfix to htpasswd().
+
+Revision 1.5.7  MD5 for Windows, and other minor changes.
+
+Revision 1.5.6  Minor enhancements.
 
 Revision 1.5.5  2002/08/14 11:27:05 Newline issue fixed for certain conditions.
 
