@@ -120,10 +120,14 @@ AVAILABILITY
     Visit <URL:http://www.perl.com/CPAN/> to find a CPAN site near you.
 
 VERSION
-    $Revision: 1.5 $ $Date: 2001/03/15 01:50:12 $
+    $Revision: 1.5.3 $ $Date: 2001/05/02 08:21:18 $
 
 CHANGES
     $Log: Htpasswd.pm,v $
+
+    Revision 1.5.3  2001/05/02 08:21:18 kevin Minor bugfix
+
+    Revision 1.5.2  2001/04/03 09:14:57 kevin Really fixed newline problem :)
 
     Revision 1.5.1 2001/03/26 08:25:38 kevin Fixed newline problem
 

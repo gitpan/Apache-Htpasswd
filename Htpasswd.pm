@@ -1,7 +1,10 @@
 package Apache::Htpasswd;
 
-# $Id: Htpasswd.pm,v 1.5.2 2001/04/03 09:14:57 kevin Exp kevin $
+# $Id: Htpasswd.pm,v 1.5.3 2001/05/02 08:21:18 kevin Exp kevin $
 # $Log: Htpasswd.pm,v $
+
+# Revision 1.5.3  2001/05/02 08:21:18 kevin
+# Minor bugfix
 
 # Revision 1.5.2  2001/04/03 09:14:57 kevin
 # Really fixed newline problem :)
@@ -258,8 +261,8 @@ sub writePassword {
 
 	    my @tmp = split(/:/,$_,3);
 	    if ( $tmp[0] eq $Id ) {
-		my $info = $tmp[2] ? $tmp[2] : "\n";
-	        push (@cache, "$Id\:$newPass\:$info");
+		my $info = $tmp[2] ? $tmp[2] : "";
+	        push (@cache, "$Id\:$newPass\:$info\n");
 	        $return = 1; 
 
 	    } else {
@@ -624,11 +627,14 @@ site near you.
 
 =head1 VERSION
 
-$Revision: 1.5.2 $ $Date: 2001/04/03 09:14:57 $
+$Revision: 1.5.3 $ $Date: 2001/05/02 08:21:18 $
 
 =head1 CHANGES
 
 $Log: Htpasswd.pm,v $
+
+Revision 1.5.3  2001/05/02 08:21:18 kevin
+Minor bugfix
 
 Revision 1.5.2  2001/04/03 09:14:57 kevin
 Really fixed newline problem :)
