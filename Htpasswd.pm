@@ -16,7 +16,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = ( all => [@EXPORT_OK] );
 
-$VERSION = '1.5.8';
+$VERSION = '1.5.9';
 
 sub Version {
     return $VERSION;
@@ -47,6 +47,7 @@ sub new {
     $self->{'LOCK'}     = 0;
     $self->{'OPEN'}     = 0;
     $self->{'READONLY'} = $args->{'ReadOnly'} if ref $args eq 'HASH';
+    $self->{'USEMD5'} = $args->{'UseMD5'} if ref $args eq 'HASH';
 
     return $self;
 }
@@ -87,7 +88,7 @@ sub htpasswd {
     my $self    = shift;
     my $Id      = shift;
     my $newPass = shift;
-    my $oldPass = shift; 
+    my $oldPass = shift;
     my $noOld = 0;
 
     if ( $self->{READONLY} ) {
@@ -118,7 +119,7 @@ sub htpasswd {
 
         if ( $self->fetchPass($Id) ) {
 
-            # User already has a password in the file. 
+            # User already has a password in the file.
             $self->{'ERROR'} =
               __PACKAGE__ . "::htpasswd - $Id already exists in $passwdFile";
             carp $self->error();
@@ -401,7 +402,7 @@ sub CryptPasswd {
     my $salt   = shift;
     my @chars  = ( '.', '/', 0 .. 9, 'A' .. 'Z', 'a' .. 'z' );
     my $Magic = '$apr1$';    # Apache specific Magic chars
-    my $cryptType = ( $^O =~ /^MSWin/i ) ? "MD5" : "crypt";
+    my $cryptType = (  $^O =~ /^MSWin/i || $self->{'USEMD5'} ) ? "MD5" : "crypt";
 
     if ( $salt && $cryptType =~ /MD5/i && $salt =~ /^\Q$Magic/ ) {
 
@@ -418,7 +419,7 @@ sub CryptPasswd {
     }
     else {
 
-# If we use MD5, create apache MD5 with 8 char salt: 3 randoms, 5 dots                                
+# If we use MD5, create apache MD5 with 8 char salt: 3 randoms, 5 dots
         if ( $cryptType =~ /MD5/i ) {
             $salt =
               join ( '', map { $chars[ int rand @chars ] } ( 0 .. 2 ) )
@@ -541,23 +542,23 @@ Apache::Htpasswd - Manage Unix crypt-style password file.
 				 ReadOnly   => 1}
 				);
 
-    # Add an entry    
+    # Add an entry
     $foo->htpasswd("zog", "password");
 
-    # Change a password    
+    # Change a password
     $foo->htpasswd("zog", "new-password", "old-password");
-    
+
     # Change a password without checking against old password
     # The 1 signals that the change is being forced.
-    
+
     $foo->htpasswd("zog", "new-password", 1);
-        
+
     # Check that a password is correct
     $foo->htCheckPassword("zog", "password");
 
-    # Fetch an encrypted password 
+    # Fetch an encrypted password
     $foo->fetchPass("foo");
-    
+
     # Delete entry
     $foo->htDelete("foo");
 
@@ -590,16 +591,18 @@ As of version 1.5.4 named params have been added, and it is suggested that
 you use them from here on out.
 
 	Apache::Htpasswd->new("path-to-file");
-    
+
 "path-to-file" should be the path and name of the file containing
 the login/password information.
 
 	Apache::Htpasswd->new({passwdFile => "path-to-file",
 			       ReadOnly   => 1,
+			       UseMD5     => 1,
 			     });
 
 This is the prefered way to instantiate an object. The 'ReadOnly' param
-is optional, and will open the file in read-only mode if used.
+is optional, and will open the file in read-only mode if used. The 'UseMD5'
+is also optionnal: it will force MD5 password under Unix.
 
 =item error;
 
@@ -659,7 +662,7 @@ Returns undef otherwise.
 
 =item fetchUsers();
 
-Will return either a list of all the user names, or a count of all the 
+Will return either a list of all the user names, or a count of all the
 users.
 
 The following will return a list:
@@ -693,12 +696,14 @@ by running these commands:
    make install
    make clean
 
+If you are going to use MD5 encrypted passwords, you need to install L<Crypt::PasswdMD5>.
+
 =head1 DOCUMENTATION
 
-POD style documentation is included in the module.  
-These are normally converted to manual pages and installed as part 
-of the "make install" process.  You should also be able to use 
-the 'perldoc' utility to extract and read documentation from the 
+POD style documentation is included in the module.
+These are normally converted to manual pages and installed as part
+of the "make install" process.  You should also be able to use
+the 'perldoc' utility to extract and read documentation from the
 module files directly.
 
 
@@ -712,6 +717,8 @@ Visit <URL:http://www.perl.com/CPAN/> to find a CPAN
 site near you.
 
 =head1 CHANGES
+
+Revision 1.5.9  MD5 for *nix with new UseMD5 arg for new()
 
 Revision 1.5.8  Bugfix to htpasswd().
 
@@ -758,7 +765,7 @@ None knows at time of writting.
 
 =head1 AUTHOR INFORMATION
 
-Copyright 1998..2002, Kevin Meltzer.  All rights reserved.  It may
+Copyright 1998..2005, Kevin Meltzer.  All rights reserved.  It may
 be used and modified freely, but I do request that this copyright
 notice remain attached to the file.  You may modify this module as you
 wish, but if you redistribute a modified version, please attach a note
@@ -774,7 +781,7 @@ software, use at your own risk.
 
 =head1 SEE ALSO
 
-L<Apache::Htgroup>
+L<Apache::Htgroup>, L<Crypt::PasswdMD5>
 
 =cut
 

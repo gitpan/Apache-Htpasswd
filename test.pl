@@ -79,11 +79,10 @@ close TEST;
 	# 13: Create in read-only mode
         &report_result($pwdFile = new Apache::Htpasswd({passwdFile => $File, ReadOnly => 1}), $! );
 
-        # 14: store a value (should fail)
+  # 14: store a value (should fail)
 	# Should carp, but don't want to display it
 	sub Apache::Htpasswd::carp {};
         &report_result(!$pwdFile->htpasswd("kevin","zog") , $! );
-	
 }
 
 print "Test complete.\n";
