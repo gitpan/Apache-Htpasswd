@@ -1,7 +1,7 @@
 package Apache::Htpasswd;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
-use strict;		# Restrict unsafe variables, references, barewords
+use strict;    # Restrict unsafe variables, references, barewords
 use Carp;
 
 use POSIX qw ( SEEK_SET SEEK_END );
@@ -11,14 +11,15 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 @EXPORT = qw();
 
-@EXPORT_OK = qw(htpasswd htDelete fetchPass fetchInfo writeInfo htCheckPassword error Version);
+@EXPORT_OK =
+  qw(htpasswd htDelete fetchPass fetchInfo writeInfo htCheckPassword error Version);
 
-%EXPORT_TAGS = (all => [@EXPORT_OK]);
+%EXPORT_TAGS = ( all => [@EXPORT_OK] );
 
-$VERSION = '1.5.5';
+$VERSION = '1.5.7';
 
 sub Version {
-	return $VERSION;
+    return $VERSION;
 }
 
 #-----------------------------------------------------------#
@@ -26,274 +27,294 @@ sub Version {
 #-----------------------------------------------------------#
 
 sub new {
-	my $proto = shift;
-	my $args = shift;
-	my $passwdFile;
+    my $proto = shift;
+    my $args  = shift;
+    my $passwdFile;
 
-	if (ref $args eq 'HASH') {
-		$passwdFile = $args->{'passwdFile'};
-	} else {
-		$passwdFile = $args;
-	}
+    if ( ref $args eq 'HASH' ) {
+        $passwdFile = $args->{'passwdFile'};
+    }
+    else {
+        $passwdFile = $args;
+    }
 
-	my $class = ref($proto) || $proto;
-	my ($self) = {};
-	bless ($self, $class);
+    my $class = ref($proto) || $proto;
+    my ($self) = {};
+    bless( $self, $class );
 
-	$self->{'PASSWD'}   = $passwdFile;
-	$self->{'ERROR'}    = "";
-	$self->{'LOCK'}     = 0;
-	$self->{'OPEN'}     = 0;
-	$self->{'READONLY'} = $args->{'ReadOnly'} if ref $args eq 'HASH';
-	
-	return $self;
+    $self->{'PASSWD'}   = $passwdFile;
+    $self->{'ERROR'}    = "";
+    $self->{'LOCK'}     = 0;
+    $self->{'OPEN'}     = 0;
+    $self->{'READONLY'} = $args->{'ReadOnly'} if ref $args eq 'HASH';
+
+    return $self;
 }
 
 #-----------------------------------------------------------#
 
 sub error {
-	my $self = shift;
-	return $self->{'ERROR'};
+    my $self = shift;
+    return $self->{'ERROR'};
 }
 
 #-----------------------------------------------------------#
 
 sub htCheckPassword {
-	my $self = shift;
-	my ($Id, $pass) = @_;
+    my $self = shift;
+    my $Id   = shift;
+    my $pass = shift;
 
-	my $cryptPass = $self->fetchPass($Id);
+    my $cryptPass = $self->fetchPass($Id);
 
-	if (!$cryptPass) { return undef; }
+    if ( !$cryptPass ) { return undef; }
 
-	my $fooCryptPass = $self->CryptPasswd($pass, $cryptPass);
+    my $fooCryptPass = $self->CryptPasswd( $pass, $cryptPass );
 
-	if ($fooCryptPass eq $cryptPass) {
-		return 1;
-	} else {
-		$self->{'ERROR'} = __PACKAGE__."::htCheckPassword - Passwords do not match.";
-		carp $self->error() unless caller ne $self;
-		return 0;
-	}
+    if ( $fooCryptPass eq $cryptPass ) {
+        return 1;
+    }
+    else {
+        $self->{'ERROR'} =
+          __PACKAGE__ . "::htCheckPassword - Passwords do not match.";
+        carp $self->error() unless caller ne $self;
+        return 0;
+    }
 }
 
 #-----------------------------------------------------------#
 
 sub htpasswd {
-	my $self      = shift;
-	my $Id        = shift;
-	my $newPass   = shift;
-	my ($oldPass) = @_ if (@_);
-	my $noOld     = 0;
+    my $self    = shift;
+    my $Id      = shift;
+    my $newPass = shift;
+    my $oldPass = @_ if @_;
+    my $noOld = 0;
 
-	if ($self->{READONLY}) {
-	    $self->{'ERROR'} = __PACKAGE__. "::htpasswd - Can't change passwords in ReadOnly mode";
-	    carp $self->error();
-	    return undef;
-	}
+    if ( $self->{READONLY} ) {
+        $self->{'ERROR'} =
+          __PACKAGE__ . "::htpasswd - Can't change passwords in ReadOnly mode";
+        carp $self->error();
+        return undef;
+    }
 
-	if (!defined($oldPass)) { $noOld=1;}
-	if (defined($oldPass) && $oldPass =~ /^\d$/) {
-		if ($oldPass) {
-			$newPass = $Id unless $newPass;
-			my $newEncrypted = $self->CryptPasswd($newPass);
-			return $self->writePassword($Id, $newEncrypted);
-		}
-	}
+    if ( !defined($oldPass) ) { $noOld = 1; }
+    if ( defined($oldPass) && $oldPass =~ /^\d$/ ) {
+        if ($oldPass) {
+            $newPass = $Id unless $newPass;
+            my $newEncrypted = $self->CryptPasswd($newPass);
+            return $self->writePassword( $Id, $newEncrypted );
+        }
+    }
 
-	# New Entry
-	if ($noOld) {
-	    my $passwdFile = $self->{'PASSWD'};
+    # New Entry
+    if ($noOld) {
+        my $passwdFile = $self->{'PASSWD'};
 
-		# Encrypt new password string
+        # Encrypt new password string
 
-		my $passwordCrypted = $self->CryptPasswd($newPass);
+        my $passwordCrypted = $self->CryptPasswd($newPass);
 
-    		$self->_open();
+        $self->_open();
 
-		if ($self->fetchPass($Id)) {
-			# User already has a password in the file. 
-			$self->{'ERROR'} = __PACKAGE__. "::htpasswd - $Id already exists in $passwdFile";
-			carp $self->error();
-			$self->_close();  
-			return undef;
-		} else {
-			# If we can add the user.
-	    		seek(FH, 0, SEEK_END);
-	    		print FH "$Id\:$passwordCrypted\n";
-	    
-	    		$self->_close();  
-	    		return 1;
-		}
+        if ( $self->fetchPass($Id) ) {
 
-    		$self->_close();
+            # User already has a password in the file. 
+            $self->{'ERROR'} =
+              __PACKAGE__ . "::htpasswd - $Id already exists in $passwdFile";
+            carp $self->error();
+            $self->_close();
+            return undef;
+        }
+        else {
 
-	} else {
-    		$self->_open();
+            # If we can add the user.
+            seek( FH, 0, SEEK_END );
+            print FH "$Id\:$passwordCrypted\n";
 
-		my $exists = $self->htCheckPassword($Id, $oldPass);
+            $self->_close();
+            return 1;
+        }
 
-		if ($exists) {
-			my ($newCrypted) = $self->CryptPasswd($newPass);
-			return $self->writePassword($Id, $newCrypted);
-		} else {
-			# ERROR returned from htCheckPass
-			$self->{'ERROR'} = __PACKAGE__."::htpasswd - Password not changed.";
-			carp $self->error();
-			return undef;
-		}
+        $self->_close();
 
-    		$self->_close();
-    	}
-} # end htpasswd
+    }
+    else {
+        $self->_open();
+
+        my $exists = $self->htCheckPassword( $Id, $oldPass );
+
+        if ($exists) {
+            my ($newCrypted) = $self->CryptPasswd($newPass);
+            return $self->writePassword( $Id, $newCrypted );
+        }
+        else {
+
+            # ERROR returned from htCheckPass
+            $self->{'ERROR'} =
+              __PACKAGE__ . "::htpasswd - Password not changed.";
+            carp $self->error();
+            return undef;
+        }
+
+        $self->_close();
+    }
+}    # end htpasswd
 
 #-----------------------------------------------------------#
 
 sub htDelete {
-	my ($self, $Id) = @_;
-	my ($passwdFile) = $self->{'PASSWD'};
-	my (@cache);
-	my ($return);
+    my $self       = shift;
+    my $Id         = shift;
+    my $passwdFile = $self->{'PASSWD'};
+    my @cache;
+    my $return;
 
-	# Loop through the file, building a cache of exising records
-	# which don't match the Id.
+    # Loop through the file, building a cache of exising records
+    # which don't match the Id.
 
-	$self->_open();
+    $self->_open();
 
-	seek(FH, 0, SEEK_SET);
-	while (<FH>) {
+    seek( FH, 0, SEEK_SET );
+    while (<FH>) {
 
-		if (/^$Id\:/) {
-			$return = 1; 
-		} else {
-			push(@cache, $_);
-		}
-	}
+        if (/^$Id\:/) {
+            $return = 1;
+        }
+        else {
+            push ( @cache, $_ );
+        }
+    }
 
+    # Write out the @cache if needed.
 
-	# Write out the @cache if needed.
+    if ($return) {
 
-	if ($return) {
+        # Return to beginning of file
+        seek( FH, 0, SEEK_SET );
 
-	    # Return to beginning of file
-	    seek(FH, 0, SEEK_SET);
-	    
-	    while (@cache) { 
-		print FH shift (@cache); 
-	    }
+        while (@cache) {
+            print FH shift (@cache);
+        }
 
-	    # Cut everything beyond current position
-	    truncate(FH, tell(FH));
+        # Cut everything beyond current position
+        truncate( FH, tell(FH) );
 
-	} else {
-	    $self->{'ERROR'} = __PACKAGE__. "::htDelete - User $Id not found in $passwdFile: $!";
-	    carp $self->error();
-	}
+    }
+    else {
+        $self->{'ERROR'} =
+          __PACKAGE__ . "::htDelete - User $Id not found in $passwdFile: $!";
+        carp $self->error();
+    }
 
-	$self->_close();
+    $self->_close();
 
-	return $return;
+    return $return;
 }
 
 #-----------------------------------------------------------#
 
 sub fetchPass {
-	my ($self) = shift;
-	my ($Id) = @_;
-	my ($passwdFile) = $self->{'PASSWD'};
+    my $self       = shift;
+    my $Id         = shift;
+    my $passwdFile = $self->{'PASSWD'};
 
-	my $passwd = 0;
+    my $passwd = 0;
 
-	$self->_open();
-	
-	while (<FH>) {
-		chop;
-		my @tmp = split(/:/,$_,3);
-		if ( $tmp[0] eq $Id ) {
-		    $passwd = $tmp[1];
-		    last;
-		}
-	}
+    $self->_open();
 
-	$self->_close();
+    while (<FH>) {
+        chop;
+        my @tmp = split ( /:/, $_, 3 );
+        if ( $tmp[0] eq $Id ) {
+            $passwd = $tmp[1];
+            last;
+        }
+    }
 
-	return $passwd;
+    $self->_close();
+
+    return $passwd;
 }
 
 #-----------------------------------------------------------#
 
 sub writePassword {
-	my $self = shift;
-	my ($Id, $newPass) = @_;
+    my $self    = shift;
+    my $Id      = shift;
+    my $newPass = shift;
 
-	my $passwdFile = $self->{'PASSWD'};
-	my @cache;
-	my $return;
-	
-	$self->_open();
-	seek(FH, 0, SEEK_SET);
+    my $passwdFile = $self->{'PASSWD'};
+    my @cache;
+    my $return;
 
-	while (<FH>) {
+    $self->_open();
+    seek( FH, 0, SEEK_SET );
 
-	    my @tmp = split(/:/,$_,3);
-	    if ( $tmp[0] eq $Id ) {
-		my $info = $tmp[2] ? $tmp[2] : "";
-		chomp $info;
-	        push (@cache, "$Id\:$newPass\:$info\n");
-	        $return = 1; 
+    while (<FH>) {
 
-	    } else {
-	        push (@cache, $_);
-	    }
-	}
+        my @tmp = split ( /:/, $_, 3 );
+        if ( $tmp[0] eq $Id ) {
+            my $info = $tmp[2] ? $tmp[2] : "";
+            chomp $info;
+            push ( @cache, "$Id\:$newPass\:$info\n" );
+            $return = 1;
 
-	# Write out the @cache, if needed.
+        }
+        else {
+            push ( @cache, $_ );
+        }
+    }
 
-	if ($return) {
-	    
-	    # Return to beginning of file
-	    seek(FH, 0, SEEK_SET);
+    # Write out the @cache, if needed.
 
-		while (@cache) { 
-			print FH shift (@cache); 
-		}
+    if ($return) {
 
-	    # Cut everything beyond current position
-	    truncate(FH, tell(FH));
+        # Return to beginning of file
+        seek( FH, 0, SEEK_SET );
 
-	} else {
-		$self->{'ERROR'} = __PACKAGE__. "::writePassword - User $Id not found in $passwdFile: $!";
-		carp $self->error() . "\n";
-	}
+        while (@cache) {
+            print FH shift (@cache);
+        }
 
-	$self->_close();
+        # Cut everything beyond current position
+        truncate( FH, tell(FH) );
 
-	return $return;
+    }
+    else {
+        $self->{'ERROR'} = __PACKAGE__
+          . "::writePassword - User $Id not found in $passwdFile: $!";
+        carp $self->error() . "\n";
+    }
+
+    $self->_close();
+
+    return $return;
 }
 
 #-----------------------------------------------------------#
 
 sub fetchInfo {
-	my ($self) = shift;
-	my ($Id) = @_;
-	my ($passwdFile) = $self->{'PASSWD'};
+    my $self       = shift;
+    my $Id         = shift;
+    my $passwdFile = $self->{'PASSWD'};
 
-	my $info = 0;
+    my $info = 0;
 
-	$self->_open();
-	
-	while (<FH>) {
-		chop;
-		my @tmp = split(/:/,$_,3);
-		if ( $tmp[0] eq $Id ) {
-		    $info = $tmp[2];
-		    last;
-		}
-	}
+    $self->_open();
 
-	$self->_close();
+    while (<FH>) {
+        chop;
+        my @tmp = split ( /:/, $_, 3 );
+        if ( $tmp[0] eq $Id ) {
+            $info = $tmp[2];
+            last;
+        }
+    }
 
-	return $info;
+    $self->_close();
+
+    return $info;
 }
 
 #-----------------------------------------------------------#
@@ -301,15 +322,15 @@ sub fetchInfo {
 sub fetchUsers {
     my $self       = shift;
     my $passwdFile = $self->{'PASSWD'};
-    my $count = 0;
+    my $count      = 0;
     my @users;
 
     $self->_open();
 
     while (<FH>) {
         chop;
-        my @tmp = split(/:/,$_,3);
-        push (@users, $tmp[0]) unless !$tmp[0];
+        my @tmp = split ( /:/, $_, 3 );
+        push ( @users, $tmp[0] ) unless !$tmp[0];
     }
 
     $self->_close();
@@ -320,69 +341,104 @@ sub fetchUsers {
 #-----------------------------------------------------------#
 
 sub writeInfo {
-	my ($self) = shift;
-	my ($Id, $newInfo) = @_;
+    my $self    = shift;
+    my $Id      = shift;
+    my $newInfo = shift;
 
-	my ($passwdFile) = $self->{'PASSWD'};
-	my (@cache);
+    my ($passwdFile) = $self->{'PASSWD'};
+    my (@cache);
 
-	my ($return);
-	
-	$self->_open();
-	seek(FH, 0, SEEK_SET);
+    my ($return);
 
-	while (<FH>) {
+    $self->_open();
+    seek( FH, 0, SEEK_SET );
 
-	        my @tmp = split(/:/,$_,3);
+    while (<FH>) {
 
-		if ( $tmp[0] eq $Id ) {
-			chomp $tmp[1] if (@tmp == 2); # Cut out EOL if there was no info
-			push (@cache, "$Id\:$tmp[1]\:$newInfo\n");
-			$return = 1; 
+        my @tmp = split ( /:/, $_, 3 );
 
-		} else {
-			push (@cache, $_);
-		}
-	}
+        if ( $tmp[0] eq $Id ) {
+            chomp $tmp[1] if ( @tmp == 2 );   # Cut out EOL if there was no info
+            push ( @cache, "$Id\:$tmp[1]\:$newInfo\n" );
+            $return = 1;
 
-	# Write out the @cache, if needed.
+        }
+        else {
+            push ( @cache, $_ );
+        }
+    }
 
-	if ($return) {
-	    
-	    # Return to beginning of file
-	    seek(FH, 0, SEEK_SET);
+    # Write out the @cache, if needed.
 
-		while (@cache) { 
-			print FH shift (@cache); 
-		}
+    if ($return) {
 
-	    # Cut everything beyond current position
-	    truncate(FH, tell(FH));
+        # Return to beginning of file
+        seek( FH, 0, SEEK_SET );
 
-	} else {
-		$self->{'ERROR'} = __PACKAGE__. "::writeInfo - User $Id not found in $passwdFile: $!";
-		carp $self->error() . "\n";
-	}
+        while (@cache) {
+            print FH shift (@cache);
+        }
 
-	$self->_close();
+        # Cut everything beyond current position
+        truncate( FH, tell(FH) );
 
-	return $return;
+    }
+    else {
+        $self->{'ERROR'} =
+          __PACKAGE__ . "::writeInfo - User $Id not found in $passwdFile: $!";
+        carp $self->error() . "\n";
+    }
+
+    $self->_close();
+
+    return $return;
 }
 
 #-----------------------------------------------------------#
 
 sub CryptPasswd {
-	my ($self) = shift;
-	my ($passwd, $salt) = @_;
+    my $self   = shift;
+    my $passwd = shift;
+    my $salt   = shift;
+    my @chars  = ( '.', '/', 0 .. 9, 'A' .. 'Z', 'a' .. 'z' );
+    my $Magic = '$apr1$';    # Apache specific Magic chars
+    my $cryptType = ( $^O =~ /^MSWin/i ) ? "MD5" : "crypt";
 
-	if ($salt) {
-		# Make sure only use 2 chars
-		$salt = substr ($salt, 0, 2);
-	} else {
-		($salt = substr ($0, 0, 2)) =~ tr/:/C/; 
-	}
+    if ( $salt && $cryptType =~ /MD5/i && $salt =~ /^\Q$Magic/ ) {
 
-	return crypt ($passwd, $salt);
+        # Borrowed from Crypt::PasswdMD5
+        $salt =~ s/^\Q$Magic//;       # Take care of the magic string if present
+        $salt =~ s/^(.*)\$.*$/$1/;    # Salt can have up to 8 chars...
+        $salt = substr( $salt, 0, 8 );    # That means no more than 8 chars too.
+                                          # For old crypt only
+    }
+    elsif ( $salt && $cryptType =~ /crypt/i ) {
+
+        # Make sure only use 2 chars
+        $salt = substr( $salt, 0, 2 );
+    }
+    else {
+
+# If we use MD5, create apache MD5 with 8 char salt: 3 randoms, 5 dots                                
+        if ( $cryptType =~ /MD5/i ) {
+            $salt =
+              join ( '', map { $chars[ int rand @chars ] } ( 0 .. 2 ) )
+              . "." x 5;
+
+            # Otherwise fallback to standard archaic crypt
+        }
+        else {
+            $salt = join ( '', map { $chars[ int rand @chars ] } ( 0 .. 1 ) );
+        }
+    }
+
+    if ( $cryptType =~ /MD5/i ) {
+				require Crypt::PasswdMD5;
+        return Crypt::PasswdMD5::apache_md5_crypt( $passwd, $salt );
+    }
+    else {
+        return crypt( $passwd, $salt );
+    }
 }
 
 #-----------------------------------------------------------#
@@ -391,57 +447,60 @@ sub DESTROY { close(FH); };
 
 #-----------------------------------------------------------#
 
-    sub _lock {
-	my ($self) = shift;
-	
-	# Lock if we don't have the lock
-        flock(FH, LOCK_EX) if($self->{'LOCK'} == 0);
+sub _lock {
+    my $self = shift;
 
-	# We have the lock
-	$self->{'LOCK'} = 1;
+    # Lock if we don't have the lock
+    flock( FH, LOCK_EX ) if ( $self->{'LOCK'} == 0 );
 
-	# Seek to head
-        seek(FH, 0, SEEK_SET);
-    }
+    # We have the lock
+    $self->{'LOCK'} = 1;
+
+    # Seek to head
+    seek( FH, 0, SEEK_SET );
+}
 
 #-----------------------------------------------------------#
 
-    sub _unlock {
-	my ($self) = shift;
+sub _unlock {
+    my $self = shift;
 
-        flock(FH, LOCK_UN);
+    flock( FH, LOCK_UN );
 
-	$self->{'LOCK'} = 0;
-    }
+    $self->{'LOCK'} = 0;
+}
 
 #-----------------------------------------------------------#
 
 sub _open {
     my $self = shift;
 
-    if($self->{'OPEN'} > 0) {
-	$self->{'OPEN'}++;
-	$self->_lock();
-	return;
+    if ( $self->{'OPEN'} > 0 ) {
+        $self->{'OPEN'}++;
+        $self->_lock();
+        return;
     }
 
     my $passwdFile = $self->{'PASSWD'};
 
-    if ($self->{READONLY}) {
-    	if (!open(FH, $passwdFile)) {
-	    $self->{'ERROR'} = __PACKAGE__. "::fetchPass - Cannot open $passwdFile: $!";
-	    croak $self->error();
-	}
-    } else {
-	if (!open(FH,"+<$passwdFile")) {
-	    $self->{'ERROR'} = __PACKAGE__. "::fetchPass - Cannot open $passwdFile: $!";
-	    croak $self->error();
+    if ( $self->{READONLY} ) {
+        if ( !open( FH, $passwdFile ) ) {
+            $self->{'ERROR'} =
+              __PACKAGE__ . "::fetchPass - Cannot open $passwdFile: $!";
+            croak $self->error();
+        }
+    }
+    else {
+        if ( !open( FH, "+<$passwdFile" ) ) {
+            $self->{'ERROR'} =
+              __PACKAGE__ . "::fetchPass - Cannot open $passwdFile: $!";
+            croak $self->error();
         }
     }
 
-    binmode(FH);	
+    binmode(FH);
     $self->{'OPEN'}++;
-    $self->_lock() unless $self->{READONLY}; # No lock on r/o
+    $self->_lock() unless $self->{READONLY};    # No lock on r/o
 }
 
 #-----------------------------------------------------------#
@@ -452,19 +511,20 @@ sub _close {
 
     $self->{'OPEN'}--;
 
-    if($self->{'OPEN'} > 0) { return; }
+    if ( $self->{'OPEN'} > 0 ) { return; }
 
-    if (!close(FH)) {
-	my $passwdFile = $self->{'PASSWD'};
-	$self->{'ERROR'} = __PACKAGE__. "::htDelete - Cannot close $passwdFile: $!";
-	carp $self->error();
-	return undef;
+    if ( !close(FH) ) {
+        my $passwdFile = $self->{'PASSWD'};
+        $self->{'ERROR'} =
+          __PACKAGE__ . "::htDelete - Cannot close $passwdFile: $!";
+        carp $self->error();
+        return undef;
     }
 }
 
 #-----------------------------------------------------------#
 
-1; 
+1;
 
 __END__
 
@@ -494,7 +554,7 @@ Apache::Htpasswd - Manage Unix crypt-style password file.
     $foo->htpasswd("zog", "new-password", 1);
         
     # Check that a password is correct
-    $pwdFile->htCheckPassword("zog", "password");
+    $foo->htCheckPassword("zog", "password");
 
     # Fetch an encrypted password 
     $foo->fetchPass("foo");
@@ -619,8 +679,7 @@ Returns undef otherwise.
 =item CryptPasswd("password", "salt");
 
 Will return an encrypted password using 'crypt'. If I<salt> is
-ommitted, a salt will be given by the subroutine using the first 2
-character of $0.
+ommitted, a salt will be created.
 
 =back
 
@@ -713,3 +772,4 @@ software, use at your own risk.
 L<Apache::Htgroup>
 
 =cut
+

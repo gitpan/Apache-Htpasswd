@@ -93,8 +93,7 @@ DESCRIPTION
 
     CryptPasswd("password", "salt");
         Will return an encrypted password using 'crypt'. If *salt* is
-        ommitted, a salt will be given by the subroutine using the first 2
-        character of $0.
+        ommitted, a salt will be generated. 
 
 INSTALLATION
     You install Apache::Htpasswd, as you would install any perl module
@@ -121,6 +120,11 @@ AVAILABILITY
 
 CHANGES
 
+    Revision 1.5.7  2004/08/23 09:05:12 Made generated salt more
+		random. Tidied up the code a bit. Also added use of Crypt::PasswdMD5
+		for Apache on MSWin for use of (modified) MD5 passwords on that
+		platform.
+	
     Revision 1.5.5  2002/08/14 11:27:05 Newline issue fixed for certain conditions.
 
     Revision 1.5.4  2002/07/26 12:17:43 kevin doc fixes, new fetchUsers method,
@@ -152,7 +156,7 @@ BUGS
     None knows at time of writting.
 
 AUTHOR INFORMATION
-    Copyright 1998..2002, Kevin Meltzer. All rights reserved. It may be used
+    Copyright 1998..2004, Kevin Meltzer. All rights reserved. It may be used
     and modified freely, but I do request that this copyright notice remain
     attached to the file. You may modify this module as you wish, but if you
     redistribute a modified version, please attach a note listing the
