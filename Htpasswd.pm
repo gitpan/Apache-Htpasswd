@@ -1,13 +1,21 @@
 package Apache::Htpasswd;
 
-# $Id: Htpasswd.pm,v 1.1 1998/10/22 03:12:08 kmeltz Exp kmeltz $
+# $Id: Htpasswd.pm,v 1.3 2000/04/04 15:00:15 meltzek Exp meltzek $
 # $Log: Htpasswd.pm,v $
-# Revision 1.1  1998/10/22 03:12:08  kmeltz
+
+# Revision 1.3  2000/04/04 15:00:15 meltzek
+# Made file locking safer to avoid race conditions. Fixed
+# typo in docs.  
+
+# Revision 1.2  1999/01/28 22:43:45  meltzek
+# Added slightly more verbose error croaks. Made sure error from htCheckPassword is only called when called directly, and not by $self.
+#
+# Revision 1.1  1998/10/22 03:12:08  meltzek
 # Slightly changed how files lock.
 # Made more use out of carp and croak.
 # Made sure there were no ^M's as per Randal Schwartz's request.
 #
-# Revision 1.0  1998/10/21 05:53:56  kmeltz
+# Revision 1.0  1998/10/21 05:53:56  meltzek
 # First version on CPAN.
 #
 
@@ -15,6 +23,9 @@ package Apache::Htpasswd;
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use strict;		# Restrict unsafe variables, references, barewords
 use Carp;
+
+use POSIX qw ( SEEK_SET SEEK_END );
+use Fcntl qw ( LOCK_EX LOCK_UN );
 
 @ISA = qw(Exporter);
 
@@ -24,10 +35,10 @@ use Carp;
 
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-($VERSION = substr(q$Revision: 1.1 $, 10)) =~ s/\s+$//;
+($VERSION = substr(q$Revision: 1.3 $, 10)) =~ s/\s+$//;
 
 sub Version {
-return $VERSION;
+	return $VERSION;
 }
 
 #-----------------------------------------------------------#
@@ -35,13 +46,17 @@ return $VERSION;
 #-----------------------------------------------------------#
 
 sub new {
-	my ($class, $passwdFile) = @_;
+	my ($proto, $passwdFile) = @_;
+
+	my $class = ref($proto) || $proto;
 	my ($self) = {};
 	bless ($self, $class);
 
 	$self->{'PASSWD'} = $passwdFile;
 	$self->{'ERROR'} = "";
-
+	$self->{'LOCK'} = 0;
+	$self->{'OPEN'} = 0;
+	
 	return $self;
 }
 
@@ -58,8 +73,6 @@ sub htCheckPassword {
 	my ($self) = shift;
 	my ($Id, $pass) = @_;
 
-	my ($passwdFile) = $self->{'PASSWD'};
-
 	my ($cryptPass) = $self->fetchPass($Id);
 
 	if (!$cryptPass) { return undef; }
@@ -69,8 +82,8 @@ sub htCheckPassword {
 	if ($fooCryptPass eq $cryptPass) {
 		return 1;
 	} else {
-		$self->{'ERROR'} = "Old passwords do not match. Change not made.";
-		carp $self->error();
+		$self->{'ERROR'} = __PACKAGE__."::htCheckPassword - Passwords do not match.";
+		carp $self->error() unless caller ne $self;
 		return 0;
 	}
 }
@@ -90,44 +103,43 @@ sub htpasswd {
 			$newPass = $Id unless $newPass;
 			my ($newEncrypted) = $self->CryptPasswd($newPass);
 			return $self->writePassword($Id, $newEncrypted);
-			exit;
 		}
 	}
 
 # New Entry
 if ($noOld == 1) {
-		my ($passwdFile) = $self->{'PASSWD'};
+    my ($passwdFile) = $self->{'PASSWD'};
 
 	# Encrypt new password string
 
 	my ($passwordCrypted) = $self->CryptPasswd($newPass);
 
+    $self->_open();
+
 	if ($self->fetchPass($Id)) {
 
 		# User already has a password in the file. 
-		$self->{'ERROR'} = "$Id already exists in $passwdFile";
+		$self->{'ERROR'} = __PACKAGE__. "::htpasswd - $Id already exists in $passwdFile";
 		carp $self->error();
+
+		$self->_close();  
 		return undef;
 	} else {
 		# If we can add the user.
-		if (!open(FH,">>$passwdFile")) {
-			$self->{'ERROR'} = "Cannot append to $passwdFile: $!";
-			croak $self->error();
-		}
-
-		_lock();
-		print FH "$Id\:$passwordCrypted\n";
-		_unlock();
-
-		if (!close(FH)) {
-			$self->{'ERROR'} = "Cannot close $passwdFile: $!";
-			croak $self->error();			
-		}
 	
-		return 1;
+	    seek(FH, 0, SEEK_END);
+	    print FH "$Id\:$passwordCrypted\n";
+	    
+	    $self->_close();  
+	    return 1;
 	}
-	} # end if $noOld == 1
+
+    $self->_close();
+
+} # end if $noOld == 1
 else {
+    $self->_open();
+
 	my ($exists) = $self->htCheckPassword($Id, $oldPass);
 
 	if ($exists) {
@@ -135,11 +147,13 @@ else {
 		return $self->writePassword($Id, $newCrypted);
 	} else {
 		# ERROR returned from htCheckPass
+		$self->{'ERROR'} = __PACKAGE__."::htpasswd - Password not changed.";
 		carp $self->error();
 		return undef;
 	}
-	
-}
+
+    $self->_close();
+    }
 } # end htpasswd
 
 #-----------------------------------------------------------#
@@ -153,10 +167,10 @@ sub htDelete {
 	# Loop through the file, building a cache of exising records
 	# which don't match the Id.
 
-	if (!open(FH,"<$passwdFile")) {
-		$self->{'ERROR'} = "cannot open $passwdFile: $!";
-		croak $self->error();
-	}
+
+	$self->_open();
+
+	seek(FH, 0, SEEK_SET);
 	while (<FH>) {
 
 		if (/^$Id\:/) {
@@ -166,36 +180,27 @@ sub htDelete {
 		}
 	}
 
-	if (!close(FH)) {
-		$self->{'ERROR'} = "cannot close $passwdFile: $!";
-		carp $self->error();
-		return undef;
-	}
 
 	# Write out the @cache if needed.
 
 	if ($return) {
 
-		if (!open(FH,">$passwdFile")) {
-			$self->{'ERROR'} = "cannot open $passwdFile: $!";
-			croak $self->error();
-		}
+	    # Return to beginning of file
+	    seek(FH, 0, SEEK_SET);
+	    
+	    while (@cache) { 
+		print FH shift (@cache); 
+	    }
 
-		_lock();
-		while (@cache) { 
-			print FH shift (@cache); 
-		}
-		_unlock();
+	    # Cut everything beyond current position
+	    truncate(FH, tell(FH));
 
-		if (!close(FH)) {
-			$self->{'ERROR'} = "Cannot close $passwdFile: $!";
-			carp $self->error();
-			return undef;
-		}
 	} else {
-		$self->{'ERROR'} = "User $Id not found in $passwdFile: $!";
-		carp $self->error();
+	    $self->{'ERROR'} = __PACKAGE__. "::htDelete - User $Id not found in $passwdFile: $!";
+	    carp $self->error();
 	}
+
+	$self->_close();
 
 	return $return;
 }
@@ -207,33 +212,22 @@ sub fetchPass {
 	my ($Id) = @_;
 	my ($passwdFile) = $self->{'PASSWD'};
 
-	if (!open(FH,"<$passwdFile")) {
-		$self->{'ERROR'} = "Cannot open $passwdFile: $!";
-		croak $self->error();
-	}
+	my $passwd = 0;
+
+	$self->_open();
 	
 	while (<FH>) {
 		chop;
 		if ( /^$Id\:/ ) {
-			if (!close(FH)) {
-				$self->{'ERROR'} = "Cannot close $passwdFile: $!";
-				carp $self->error();
-				return undef;
-			}
-
-			$_ =~ s/^[^:]*://;
-			return $_;
+		    $passwd = $_;
+		    $passwd =~ s/^[^:]*://;    
+		    last;
 		}
 	}
 
-	# Password not found
-	if (!close(FH)) {
-		$self->{'ERROR'} = "Cannot close $passwdFile: $!";
-		carp $self->error();
-		return undef;
-	}
-	
-	return 0;
+	$self->_close();
+
+	return $passwd;
 }
 
 #-----------------------------------------------------------#
@@ -246,11 +240,9 @@ sub writePassword {
 	my (@cache);
 
 	my ($return);
-
-	if (!open(FH,"<$passwdFile")) {
-		$self->{'ERROR'} = "cannot open $passwdFile: $!";
-		croak $self->error();
-	}
+	
+	$self->_open();
+	seek(FH, 0, SEEK_SET);
 
 	while (<FH>) {
 
@@ -263,37 +255,26 @@ sub writePassword {
 		}
 	}
 
-	if (!close(FH)) {
-		$self->{'ERROR'} = "cannot close $passwdFile: $!";
-		carp $self->error();
-		return undef;
-	}
-
 	# Write out the @cache, if needed.
 
 	if ($return) {
-
-		if (!open(FH, ">$passwdFile")) {
-			$self->{'ERROR'} = "cannot open $passwdFile: $!";
-			croak $self->error();
-		}
-
-		_lock();
+	    
+	    # Return to beginning of file
+	    seek(FH, 0, SEEK_SET);
 
 		while (@cache) { 
 			print FH shift (@cache); 
 		}
-		_unlock();
 
-		if (!close(FH)) {
-			$self->{'ERROR'} = "Cannot close $passwdFile: $!";
-			carp $self->error() . "\n";
-			return undef;
-		}
+	    # Cut everything beyond current position
+	    truncate(FH, tell(FH));
+
 	} else {
-		$self->{'ERROR'} = "User $Id not found in $passwdFile: $!";
+		$self->{'ERROR'} = __PACKAGE__. "::writePassword - User $Id not found in $passwdFile: $!";
 		carp $self->error() . "\n";
 	}
+
+	$self->_close();
 
 	return $return;
 }
@@ -316,22 +297,74 @@ sub CryptPasswd {
 
 #-----------------------------------------------------------#
 
-sub DESTROY {};
+# Always release lock, just to be on the safe side
+sub DESTROY { close(FH); };
 
 #-----------------------------------------------------------#
 
     sub _lock {
-        flock(FH,2);
-        # and, in case someone appended
-        # while we were waiting...
-        seek(FH, 0, 2);
+	my ($self) = shift;
+	
+	# Lock if we don't have the lock
+        flock(FH, LOCK_EX) if($self->{'LOCK'} == 0);
+
+	# We have the lock
+	$self->{'LOCK'} = 1;
+
+	# Seek to head
+        seek(FH, 0, SEEK_SET);
     }
 
 #-----------------------------------------------------------#
 
     sub _unlock {
-        flock(FH,8);
+	my ($self) = shift;
+
+        flock(FH, LOCK_UN);
+
+	$self->{'LOCK'} = 0;
     }
+
+#-----------------------------------------------------------#
+
+sub _open {
+    my ($self) = shift;
+
+    if($self->{'OPEN'} > 0) {
+	$self->{'OPEN'}++;
+	$self->_lock();
+	return;
+    }
+
+    my $passwdFile = $self->{'PASSWD'};
+    if (!open(FH,"+<$passwdFile")) {
+	$self->{'ERROR'} = __PACKAGE__. "::fetchPass - Cannot open $passwdFile: $!";
+	croak $self->error();
+    }
+
+    $self->{'OPEN'}++;
+    $self->_lock();
+}
+
+#-----------------------------------------------------------#
+
+sub _close {
+    my ($self) = shift;
+    $self->_unlock();
+
+    $self->{'OPEN'}--;
+
+    if($self->{'OPEN'} > 0) { return; }
+
+    if (!close(FH)) {
+	my $passwdFile = $self->{'PASSWD'};
+	$self->{'ERROR'} = __PACKAGE__. "::htDelete - Cannot close $passwdFile: $!";
+	carp $self->error();
+	return undef;
+    }
+
+
+}
 
 #-----------------------------------------------------------#
 
@@ -361,7 +394,7 @@ Apache::Htpasswd - Manage Unix crypt-style password file.
     $foo->htpasswd("zog", "new-password", 1);
         
     # Check that a password is correct
-    $pwdFile->htCheckPassord("zog", "password");
+    $pwdFile->htCheckPassword("zog", "password");
 
     # Fetch an encrypted password 
     $foo->fetchPass("foo");
@@ -482,11 +515,19 @@ site near you.
 
 =head1 VERSION
 
-$Revision: 1.1 $ $Date: 1998/10/22 03:12:08 $
+$Revision: 1.3 $ $Date: 2000/04/04 15:00:13 $
 
 =head1 CHANGES
 
 $Log: Htpasswd.pm,v $
+
+Revision 1.3  2000/04/04 15:00:15 meltzek
+Made file locking safer to avoid race conditions. Fixed
+typo in docs.
+
+Revision 1.2  1999/01/28 22:43:45  meltzek
+Added slightly more verbose error croaks. Made sure error from htCheckPassword is only called when called directly, and not by $self.
+
 Revision 1.1  1998/10/22 03:12:08  meltzek
 Slightly changed how files lock.
 Made more use out of carp and croak.
@@ -499,16 +540,20 @@ None knows at time of writting.
 
 =head1 AUTHOR INFORMATION
 
-Copyright 1998, Kevin Meltzer.  All rights reserved.  It may
+Copyright 1998, 1999, 2000, Kevin Meltzer.  All rights reserved.  It may
 be used and modified freely, but I do request that this copyright
 notice remain attached to the file.  You may modify this module as you
 wish, but if you redistribute a modified version, please attach a note
 listing the modifications you have made.
 
 Address bug reports and comments to:
-kmeltz@cris.com
+perlguy@perlguy.com
 
 The author makes no warranties, promises, or gaurentees of this software. As with all
 software, use at your own risk.
+
+=head1 SEE ALSO
+
+L<Apache::Htgroup>
 
 =cut
