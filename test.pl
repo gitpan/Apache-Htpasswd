@@ -62,7 +62,23 @@ close TEST;
 	# 10: Delete user
 	&report_result($pwdFile->htDelete("kevin"),$!);
 	
-	
+        # 11: get list
+        my @list = $pwdFile->fetchUsers();
+        &report_result($list[0] eq 'foo', $!);
+
+	# 12: get number of users
+        my $num  = $pwdFile->fetchUsers();
+        &report_result($num == 1, $!);
+
+	undef $pwdFile;
+
+	# 13: Create in read-only mode
+        &report_result($pwdFile = new Apache::Htpasswd({passwdFile => $File, ReadOnly => 1}), $! );
+
+        # 14: store a value (should fail)
+	# Should carp, but don't want to display it
+	sub Apache::Htpasswd::carp {};
+        &report_result(!$pwdFile->htpasswd("kevin","zog") , $! );
 	
 }
 

@@ -1,40 +1,5 @@
 package Apache::Htpasswd;
 
-# $Id: Htpasswd.pm,v 1.5.3 2001/05/02 08:21:18 kevin Exp kevin $
-# $Log: Htpasswd.pm,v $
-
-# Revision 1.5.3  2001/05/02 08:21:18 kevin
-# Minor bugfix
-
-# Revision 1.5.2  2001/04/03 09:14:57 kevin
-# Really fixed newline problem :)
-
-# Revision 1.5.1  2001/03/26 08:25:38 kevin
-# Fixed another newline problem
-
-# Revision 1.5  2001/03/15 01:50:12 kevin
-# Fixed bug to remove newlines
-
-# Revision 1.4  2001/02/23 08:23:46 kevin
-# Added support for extra info fields
-
-# Revision 1.3  2000/04/04 15:00:15 meltzek
-# Made file locking safer to avoid race conditions. Fixed
-# typo in docs.  
-
-# Revision 1.2  1999/01/28 22:43:45  meltzek
-# Added slightly more verbose error croaks. Made sure error from htCheckPassword is only called when called directly, and not by $self.
-#
-# Revision 1.1  1998/10/22 03:12:08  meltzek
-# Slightly changed how files lock.
-# Made more use out of carp and croak.
-# Made sure there were no ^M's as per Randal Schwartz's request.
-#
-# Revision 1.0  1998/10/21 05:53:56  meltzek
-# First version on CPAN.
-#
-
-
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use strict;		# Restrict unsafe variables, references, barewords
 use Carp;
@@ -50,7 +15,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-($VERSION = substr(q$Revision: 1.5.2 $, 10)) =~ s/\s+$//;
+($VERSION = substr(q$Revision: 1.5.4 $, 10)) =~ s/\s+$//;
 
 sub Version {
 	return $VERSION;
@@ -61,16 +26,25 @@ sub Version {
 #-----------------------------------------------------------#
 
 sub new {
-	my ($proto, $passwdFile) = @_;
+	my $proto = shift;
+	my $args = shift;
+	my $passwdFile;
+
+	if (ref $args eq 'HASH') {
+		$passwdFile = $args->{'passwdFile'};
+	} else {
+		$passwdFile = $args;
+	}
 
 	my $class = ref($proto) || $proto;
 	my ($self) = {};
 	bless ($self, $class);
 
-	$self->{'PASSWD'} = $passwdFile;
-	$self->{'ERROR'} = "";
-	$self->{'LOCK'} = 0;
-	$self->{'OPEN'} = 0;
+	$self->{'PASSWD'}   = $passwdFile;
+	$self->{'ERROR'}    = "";
+	$self->{'LOCK'}     = 0;
+	$self->{'OPEN'}     = 0;
+	$self->{'READONLY'} = $args->{'ReadOnly'} if ref $args eq 'HASH';
 	
 	return $self;
 }
@@ -78,21 +52,21 @@ sub new {
 #-----------------------------------------------------------#
 
 sub error {
-	my ($self) = @_;
+	my $self = shift;
 	return $self->{'ERROR'};
 }
 
 #-----------------------------------------------------------#
 
 sub htCheckPassword {
-	my ($self) = shift;
+	my $self = shift;
 	my ($Id, $pass) = @_;
 
-	my ($cryptPass) = $self->fetchPass($Id);
+	my $cryptPass = $self->fetchPass($Id);
 
 	if (!$cryptPass) { return undef; }
 
-	my ($fooCryptPass) = $self->CryptPasswd($pass, $cryptPass);
+	my $fooCryptPass = $self->CryptPasswd($pass, $cryptPass);
 
 	if ($fooCryptPass eq $cryptPass) {
 		return 1;
@@ -106,42 +80,45 @@ sub htCheckPassword {
 #-----------------------------------------------------------#
 
 sub htpasswd {
-	my ($self) = shift;
-	my ($Id) = shift;
-	my ($newPass) = shift;
+	my $self      = shift;
+	my $Id        = shift;
+	my $newPass   = shift;
 	my ($oldPass) = @_ if (@_);
-	my ($noOld)=0;
+	my $noOld     = 0;
+
+	if ($self->{READONLY}) {
+	    $self->{'ERROR'} = __PACKAGE__. "::htpasswd - Can't change passwords in ReadOnly mode";
+	    carp $self->error();
+	    return undef;
+	}
 
 	if (!defined($oldPass)) { $noOld=1;}
 	if (defined($oldPass) && $oldPass =~ /^\d$/) {
 		if ($oldPass) {
 			$newPass = $Id unless $newPass;
-			my ($newEncrypted) = $self->CryptPasswd($newPass);
+			my $newEncrypted = $self->CryptPasswd($newPass);
 			return $self->writePassword($Id, $newEncrypted);
 		}
 	}
 
 	# New Entry
 	if ($noOld) {
-	    my ($passwdFile) = $self->{'PASSWD'};
+	    my $passwdFile = $self->{'PASSWD'};
 
 		# Encrypt new password string
 
-		my ($passwordCrypted) = $self->CryptPasswd($newPass);
+		my $passwordCrypted = $self->CryptPasswd($newPass);
 
     		$self->_open();
 
 		if ($self->fetchPass($Id)) {
-
 			# User already has a password in the file. 
 			$self->{'ERROR'} = __PACKAGE__. "::htpasswd - $Id already exists in $passwdFile";
 			carp $self->error();
-
 			$self->_close();  
 			return undef;
 		} else {
 			# If we can add the user.
-	
 	    		seek(FH, 0, SEEK_END);
 	    		print FH "$Id\:$passwordCrypted\n";
 	    
@@ -154,7 +131,7 @@ sub htpasswd {
 	} else {
     		$self->_open();
 
-		my ($exists) = $self->htCheckPassword($Id, $oldPass);
+		my $exists = $self->htCheckPassword($Id, $oldPass);
 
 		if ($exists) {
 			my ($newCrypted) = $self->CryptPasswd($newPass);
@@ -246,13 +223,12 @@ sub fetchPass {
 #-----------------------------------------------------------#
 
 sub writePassword {
-	my ($self) = shift;
+	my $self = shift;
 	my ($Id, $newPass) = @_;
 
-	my ($passwdFile) = $self->{'PASSWD'};
-	my (@cache);
-
-	my ($return);
+	my $passwdFile = $self->{'PASSWD'};
+	my @cache;
+	my $return;
 	
 	$self->_open();
 	seek(FH, 0, SEEK_SET);
@@ -321,6 +297,27 @@ sub fetchInfo {
 
 #-----------------------------------------------------------#
 
+sub fetchUsers {
+    my $self       = shift;
+    my $passwdFile = $self->{'PASSWD'};
+    my $count = 0;
+    my @users;
+
+    $self->_open();
+
+    while (<FH>) {
+        chop;
+        my @tmp = split(/:/,$_,3);
+        push (@users, $tmp[0]) unless !$tmp[0];
+    }
+
+    $self->_close();
+
+    return wantarray() ? @users : scalar @users;
+}
+
+#-----------------------------------------------------------#
+
 sub writeInfo {
 	my ($self) = shift;
 	my ($Id, $newInfo) = @_;
@@ -381,7 +378,7 @@ sub CryptPasswd {
 		# Make sure only use 2 chars
 		$salt = substr ($salt, 0, 2);
 	} else {
-		$salt = substr ($0, 0, 2);
+		($salt = substr ($0, 0, 2)) =~ tr/:/C/; 
 	}
 
 	return crypt ($passwd, $salt);
@@ -419,7 +416,7 @@ sub DESTROY { close(FH); };
 #-----------------------------------------------------------#
 
 sub _open {
-    my ($self) = shift;
+    my $self = shift;
 
     if($self->{'OPEN'} > 0) {
 	$self->{'OPEN'}++;
@@ -428,20 +425,29 @@ sub _open {
     }
 
     my $passwdFile = $self->{'PASSWD'};
-    if (!open(FH,"+<$passwdFile")) {
-	$self->{'ERROR'} = __PACKAGE__. "::fetchPass - Cannot open $passwdFile: $!";
-	croak $self->error();
+
+    if ($self->{READONLY}) {
+    	if (!open(FH, $passwdFile)) {
+	    $self->{'ERROR'} = __PACKAGE__. "::fetchPass - Cannot open $passwdFile: $!";
+	    croak $self->error();
+	}
+    } else {
+	if (!open(FH,"+<$passwdFile")) {
+	    $self->{'ERROR'} = __PACKAGE__. "::fetchPass - Cannot open $passwdFile: $!";
+	    croak $self->error();
+        }
     }
 
+    binmode(FH);	
     $self->{'OPEN'}++;
-    $self->_lock();
+    $self->_lock() unless $self->{READONLY}; # No lock on r/o
 }
 
 #-----------------------------------------------------------#
 
 sub _close {
-    my ($self) = shift;
-    $self->_unlock();
+    my $self = shift;
+    $self->_unlock() unless $self->{READONLY};
 
     $self->{'OPEN'}--;
 
@@ -453,8 +459,6 @@ sub _close {
 	carp $self->error();
 	return undef;
     }
-
-
 }
 
 #-----------------------------------------------------------#
@@ -472,6 +476,10 @@ Apache::Htpasswd - Manage Unix crypt-style password file.
     use Apache::Htpasswd;
 
     $foo = new Apache::Htpasswd("path-to-file");
+
+    $foo = new Apache::Htpasswd({passwdFile => "path-to-file",
+				 ReadOnly   => 1}
+				);
 
     # Add an entry    
     $foo->htpasswd("zog", "password");
@@ -516,11 +524,22 @@ it was written specifically for .htaccess style files.
 
 =over 4
 
-=item htaccess->new("path-to-file");
+=item Apache::Htpasswd->new(...);
 
+As of version 1.5.4 named params have been added, and it is suggested that
+you use them from here on out.
+
+	Apache::Htpasswd->new("path-to-file");
+    
 "path-to-file" should be the path and name of the file containing
 the login/password information.
 
+	Apache::Htpasswd->new({passwdFile => "path-to-file",
+			       ReadOnly   => 1,
+			     });
+
+This is the prefered way to instantiate an object. The 'ReadOnly' param
+is optional, and will open the file in read-only mode if used.
 
 =item error;
 
@@ -566,13 +585,11 @@ to be changed. It does no verification of old-passwords.
 Returns 1 if succeeds
 Returns undef if fails
 
-
-=item fetchPassword("login");
+=item fetchPass("login");
 
 Returns I<encrypted> password if succeeds.
 Returns 0 if login is invalid.
 Returns undef otherwise.
-
 
 =item fetchInfo("login");
 
@@ -580,6 +597,16 @@ Returns additional information if succeeds.
 Returns 0 if login is invalid.
 Returns undef otherwise.
 
+=item fetchUsers();
+
+Will return either a list of all the user names, or a count of all the 
+users.
+
+The following will return a list:
+my @users = $Htpasswd->fetchUsers();
+
+The following will return the count:
+my $user_count = $Htpasswd->fetchUsers();
 
 =item writeInfo("login", "info");
 
@@ -627,11 +654,14 @@ site near you.
 
 =head1 VERSION
 
-$Revision: 1.5.3 $ $Date: 2001/05/02 08:21:18 $
+$Revision: 1.5.4 $ 
 
 =head1 CHANGES
 
 $Log: Htpasswd.pm,v $
+
+Revision 1.5.4  2002/07/26 12:17:43 kevin doc fixes, new fetchUsers method,
+new ReadOnly option, named params for new(), various others
 
 Revision 1.5.3  2001/05/02 08:21:18 kevin
 Minor bugfix
