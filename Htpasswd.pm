@@ -15,7 +15,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-($VERSION = substr(q$Revision: 1.5.4 $, 10)) =~ s/\s+$//;
+$VERSION = '1.5.5';
 
 sub Version {
 	return $VERSION;
@@ -238,6 +238,7 @@ sub writePassword {
 	    my @tmp = split(/:/,$_,3);
 	    if ( $tmp[0] eq $Id ) {
 		my $info = $tmp[2] ? $tmp[2] : "";
+		chomp $info;
 	        push (@cache, "$Id\:$newPass\:$info\n");
 	        $return = 1; 
 
@@ -652,13 +653,9 @@ The latest version of Apache::Htpasswd should always be available from:
 Visit <URL:http://www.perl.com/CPAN/> to find a CPAN
 site near you.
 
-=head1 VERSION
-
-$Revision: 1.5.4 $ 
-
 =head1 CHANGES
 
-$Log: Htpasswd.pm,v $
+Revision 1.5.5  2002/08/14 11:27:05 Newline issue fixed for certain conditions.
 
 Revision 1.5.4  2002/07/26 12:17:43 kevin doc fixes, new fetchUsers method,
 new ReadOnly option, named params for new(), various others
@@ -697,7 +694,7 @@ None knows at time of writting.
 
 =head1 AUTHOR INFORMATION
 
-Copyright 1998..2001, Kevin Meltzer.  All rights reserved.  It may
+Copyright 1998..2002, Kevin Meltzer.  All rights reserved.  It may
 be used and modified freely, but I do request that this copyright
 notice remain attached to the file.  You may modify this module as you
 wish, but if you redistribute a modified version, please attach a note

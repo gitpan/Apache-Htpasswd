@@ -1,5 +1,8 @@
-# $Id: test.pl,v 0.3 1998/10/22 02:49:53 meltzek Exp $
+# $Id: test.pl,v 1.1.1.1 2002/07/26 18:58:46 root Exp $
 # $Log: test.pl,v $
+# Revision 1.1.1.1  2002/07/26 18:58:46  root
+# initial
+#
 # Revision 0.3  1998/10/22 02:49:53  meltzek
 # Added verbose begining and ending of test.
 #

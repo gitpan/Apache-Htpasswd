@@ -1,5 +1,5 @@
 # -*- perl -*-
-# $Id: Makefile.PL,v 0.02 1998/28/9 09:45:13 kmeltz Exp $
+# $Id: Makefile.PL,v 1.1.1.1 2002/07/26 18:58:46 root Exp $
 use ExtUtils::MakeMaker;
 
 WriteMakefile(

@@ -119,11 +119,9 @@ AVAILABILITY
 
     Visit <URL:http://www.perl.com/CPAN/> to find a CPAN site near you.
 
-VERSION
-    $Revision: 1.5.3 $ $Date: 2001/05/02 08:21:18 $
-
 CHANGES
-    $Log: Htpasswd.pm,v $
+
+    Revision 1.5.5  2002/08/14 11:27:05 Newline issue fixed for certain conditions.
 
     Revision 1.5.4  2002/07/26 12:17:43 kevin doc fixes, new fetchUsers method,
     new ReadOnly option, named params for new(), various others
