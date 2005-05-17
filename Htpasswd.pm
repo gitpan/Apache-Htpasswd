@@ -16,7 +16,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = ( all => [@EXPORT_OK] );
 
-$VERSION = '1.5.9';
+$VERSION = '1.6.0';
 
 sub Version {
     return $VERSION;
@@ -413,9 +413,12 @@ sub CryptPasswd {
                                           # For old crypt only
     }
     elsif ( $salt && $cryptType =~ /crypt/i ) {
-
-        # Make sure only use 2 chars
-        $salt = substr( $salt, 0, 2 );
+        if ($salt =~ /\$2a\$\d+\$(.{23})/) {
+            $salt = $1;
+        } else {
+            # Make sure only use 2 chars
+            $salt = substr( $salt, 0, 2 );
+        }  
     }
     else {
 
@@ -717,6 +720,8 @@ Visit <URL:http://www.perl.com/CPAN/> to find a CPAN
 site near you.
 
 =head1 CHANGES
+
+Revision 1.6.0  Handle Blowfish hashes when that's the mechanism crypt() uses.
 
 Revision 1.5.9  MD5 for *nix with new UseMD5 arg for new()
 
