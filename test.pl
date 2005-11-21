@@ -36,7 +36,7 @@ sub report_skip {
 
 # Create a test password file
 my $File = "testpasswords.test";
-open(TEST,">$File");
+open(TEST,">$File") || die "Can't run tests because I can't create $File [$!]";
 print TEST "kevin:kjDqW.pgNIz3Ufoo:suvPq./X7Q8nk\n";
 close TEST;
 
@@ -55,7 +55,7 @@ close TEST;
 	&report_result($pwdFile->htpasswd("foo", "goo","foobar" ) , $! );
 	
 	# 5: force change value
-	&report_result($pwdFile->htpasswd("foo","ummm",1), $! );
+	&report_result($pwdFile->htpasswd("foo","ummm",{'overwrite' => 1}), $! );
 
 	# 6: check the stored value
 	&report_result($pwdFile->fetchPass("foo") , $!);

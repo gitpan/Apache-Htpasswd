@@ -1,6 +1,7 @@
 package Apache::Htpasswd;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
+use warnings;
 use strict;    # Restrict unsafe variables, references, barewords
 use Carp;
 
@@ -16,7 +17,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = ( all => [@EXPORT_OK] );
 
-$VERSION = '1.6.1';
+$VERSION = '1.7';
 
 sub Version {
     return $VERSION;
@@ -116,9 +117,12 @@ sub htpasswd {
         return undef;
     }
 
-    if ( !defined($oldPass) ) { $noOld = 1; }
-    if ( defined($oldPass) && $oldPass =~ /^\d$/ ) {
-        if ($oldPass) {
+    if ( !defined($oldPass) ) { 
+			$noOld = 1; 
+		}
+
+    if ( defined($oldPass) && ref $oldPass eq 'HASH' ) {
+        if ($oldPass->{'overwrite'}) {
             $newPass = $Id unless $newPass;
             my $newEncrypted = $self->CryptPasswd($newPass);
             return $self->writePassword( $Id, $newEncrypted );
@@ -665,7 +669,7 @@ it will replace it with I<new-password>. If the I<old-password>
 is not correct, will return 0.
 
 
-=item htpasswd("login", "new-password", 1);
+=item htpasswd("login", "new-password", {'overwrite' => 1});
 
 Will replace the password for the login. This will force the password
 to be changed. It does no verification of old-passwords.
@@ -745,7 +749,9 @@ site near you.
 
 =head1 CHANGES
 
-Revision 1.6.1  Handle SHA1 and plaintext
+Revision 1.7.0  Handle SHA1 and plaintext. Also change the interface
+for allowing change of password without first checking old password. IF
+YOU DON'T READ THE DOCS AND SEE I DID THIS DON'T EMAIL ME!
 
 Revision 1.6.0  Handle Blowfish hashes when that's the mechanism crypt() uses.
 
@@ -792,7 +798,7 @@ Made sure there were no ^M's as per Randal Schwartz's request.
 
 =head1 BUGS
 
-None knows at time of writting.
+None known at time of writting.
 
 =head1 AUTHOR INFORMATION
 
@@ -812,7 +818,7 @@ software, use at your own risk.
 
 =head1 SEE ALSO
 
-L<Apache::Htgroup>, L<Crypt::PasswdMD5>
+L<Apache::Htgroup>, L<Crypt::PasswdMD5>, L<Digest::SHA1>, L<MIME::Base64>
 
 =cut
 
