@@ -10,7 +10,7 @@
 # Added new checks.
 #
 
-BEGIN { $| = 1; print "Tests 1..10 begining\n"; }
+BEGIN { $| = 1; print "Tests 1..20 begining\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Apache::Htpasswd;
 
@@ -25,6 +25,12 @@ sub report_result {
 	print "not " unless $ok;
 	print "ok $TEST_NUM\n";
 	print "@_\n" if (not $ok and $ENV{TEST_VERBOSE});
+	$TEST_NUM++;
+}
+
+sub report_skip {
+        my $why = shift;
+        print "not ok $TEST_NUM # SKIP $why\n";
 	$TEST_NUM++;
 }
 
@@ -83,6 +89,42 @@ close TEST;
 	# Should carp, but don't want to display it
 	sub Apache::Htpasswd::carp {};
         &report_result(!$pwdFile->htpasswd("kevin","zog") , $! );
+
+}
+
+open(TEST,">>$File");
+print TEST "cryptuser:Iao36C/TVmCRc\n";
+print TEST "MD5user:\$apr1\$Yy.pS/..\$4bwpMUiVq/95BDr4kZ2lK.\n";
+print TEST "SHA1user:{SHA}QL0AFWMIX8NRZTKeof9cXsvbvu8=\n";
+print TEST "plainuser:123\n";
+close TEST;
+
+{
+	# 16: Create in read-only mode with UsePlain
+        &report_result($pwdFile = new Apache::Htpasswd({passwdFile => $File, ReadOnly => 1, UsePlain => 1}), $! );
+
+	# 17: check whether crypt passwords work
+	&report_result($pwdFile->htCheckPassword("cryptuser","123"),$!);
+
+	# 18: check whether MD5 passwords work
+        eval { require Crypt::PasswdMD5 };
+        if ($@) {
+            &report_skip('Crypt::PasswdMD5 required for this test');
+        } else {
+            &report_result($pwdFile->htCheckPassword("MD5user","123"),$!);
+        }
+
+	# 19: check whether SHA1 passwords work
+        eval { require Digest::MD5; require MIME::Base64 };
+        if ($@) {
+            &report_skip('Digest::MD5 and MIME::Base64 required for this test');
+        } else {
+            &report_result($pwdFile->htCheckPassword("SHA1user","123"),$!);
+        }
+
+	# 20: check whether plain passwords work
+	&report_result($pwdFile->htCheckPassword("plainuser","123"),$!);
+
 }
 
 print "Test complete.\n";

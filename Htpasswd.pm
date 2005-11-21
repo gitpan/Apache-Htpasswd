@@ -16,7 +16,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = ( all => [@EXPORT_OK] );
 
-$VERSION = '1.6.0';
+$VERSION = '1.6.1';
 
 sub Version {
     return $VERSION;
@@ -48,6 +48,7 @@ sub new {
     $self->{'OPEN'}     = 0;
     $self->{'READONLY'} = $args->{'ReadOnly'} if ref $args eq 'HASH';
     $self->{'USEMD5'} = $args->{'UseMD5'} if ref $args eq 'HASH';
+    $self->{'USEPLAIN'} = $args->{'UsePlain'} if ref $args eq 'HASH';
 
     return $self;
 }
@@ -65,21 +66,38 @@ sub htCheckPassword {
     my $self = shift;
     my $Id   = shift;
     my $pass = shift;
+    my $MD5Magic = '$apr1$';
+    my $SHA1Magic = '{SHA}';
 
     my $cryptPass = $self->fetchPass($Id);
     if ( !$cryptPass ) { return undef; }
 
-    my $fooCryptPass = $self->CryptPasswd( $pass, $cryptPass );
+    if (index($cryptPass, $MD5Magic) == 0) {
+        # This is an MD5 password
+        require Crypt::PasswdMD5;
+        my $salt = $cryptPass;
+        $salt =~ s/^\Q$MD5Magic//;      # Take care of the magic string if present
+        $salt =~ s/^(.*)\$/$1/;         # Salt can have up to 8 chars...
+        $salt = substr( $salt, 0, 8 );  # That means no more than 8 chars too.
+        return 1 if Crypt::PasswdMD5::apache_md5_crypt( $pass, $salt ) eq $cryptPass;
+    }
+    elsif (index($cryptPass, $SHA1Magic) == 0) {
+        # This is an SHA1 password
+        require Digest::SHA1;
+        require MIME::Base64;
+        return 1 if '{SHA}'.MIME::Base64::encode_base64( Digest::SHA1::sha1( $pass ), '' ) eq $cryptPass;
+    }
 
-    if ( $fooCryptPass eq $cryptPass ) {
-        return 1;
-    }
-    else {
-        $self->{'ERROR'} =
-          __PACKAGE__ . "::htCheckPassword - Passwords do not match.";
-        carp $self->error() unless caller ne $self;
-        return 0;
-    }
+    # See if it is encrypted using crypt
+    return 1 if crypt($pass, $cryptPass) eq $cryptPass;
+
+    # See if it is a plain, unencrypted password
+    return 1 if $self->{USEPLAIN} && $pass eq $cryptPass;
+    
+    $self->{'ERROR'} =
+        __PACKAGE__ . "::htCheckPassword - Passwords do not match.";
+    carp $self->error() unless caller ne $self;
+    return 0;
 }
 
 #-----------------------------------------------------------#
@@ -605,12 +623,16 @@ the login/password information.
 
 This is the prefered way to instantiate an object. The 'ReadOnly' param
 is optional, and will open the file in read-only mode if used. The 'UseMD5'
-is also optionnal: it will force MD5 password under Unix.
+is also optional: it will force MD5 password under Unix.
+
+If you want to support plain un-encrypted passwords, then you need to set
+the UsePlain option (this is NOT recommended, but might be necesary in some
+situations)
 
 =item error;
 
 If a method returns an error, or a method fails, the error can
-be retrived by calling error()
+be retrieved by calling error()
 
 
 =item htCheckPassword("login", "password");
@@ -701,6 +723,8 @@ by running these commands:
 
 If you are going to use MD5 encrypted passwords, you need to install L<Crypt::PasswdMD5>.
 
+If you need to support SHA1 encrypted passwords, you need to install L<Digest::SHA1> and L<MIME::Base64>.
+
 =head1 DOCUMENTATION
 
 POD style documentation is included in the module.
@@ -720,6 +744,8 @@ Visit <URL:http://www.perl.com/CPAN/> to find a CPAN
 site near you.
 
 =head1 CHANGES
+
+Revision 1.6.1  Handle SHA1 and plaintext
 
 Revision 1.6.0  Handle Blowfish hashes when that's the mechanism crypt() uses.
 
@@ -779,7 +805,7 @@ listing the modifications you have made.
 This is released under the same terms as Perl itself.
 
 Address bug reports and comments to:
-perlguy@perlguy.com
+kmeltz@cpan.org
 
 The author makes no warranties, promises, or gaurentees of this software. As with all
 software, use at your own risk.
