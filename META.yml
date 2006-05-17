@@ -1,10 +1,13 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Apache-Htpasswd
-version:      1.7
+version:      1.8
 version_from: Htpasswd.pm
 installdirs:  site
 requires:
+    Crypt::PasswdMD5:              0
+    Digest::SHA1:                  2
+    MIME::Base64:                  0
 
 distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.17
+generated_by: ExtUtils::MakeMaker version 6.30

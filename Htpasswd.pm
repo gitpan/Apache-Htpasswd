@@ -17,7 +17,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = ( all => [@EXPORT_OK] );
 
-$VERSION = '1.7';
+$VERSION = '1.8';
 
 sub Version {
     return $VERSION;
@@ -574,9 +574,8 @@ Apache::Htpasswd - Manage Unix crypt-style password file.
     $foo->htpasswd("zog", "new-password", "old-password");
 
     # Change a password without checking against old password
-    # The 1 signals that the change is being forced.
 
-    $foo->htpasswd("zog", "new-password", 1);
+    $foo->htpasswd("zog", "new-password", {'overwrite' => 1});
 
     # Check that a password is correct
     $foo->htCheckPassword("zog", "password");
@@ -748,6 +747,8 @@ Visit <URL:http://www.perl.com/CPAN/> to find a CPAN
 site near you.
 
 =head1 CHANGES
+
+Revision 1.8.0  Added proper PREREQ_PM
 
 Revision 1.7.0  Handle SHA1 and plaintext. Also change the interface
 for allowing change of password without first checking old password. IF

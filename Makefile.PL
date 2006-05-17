@@ -8,6 +8,11 @@ if ($^O !~ /MSWIN/i) {
 	   VERSION_FROM  => 'Htpasswd.pm',
 	   'dist'        => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
 	   'clean'       => { FILES => q[*% *.bak *.old *.test]},
+		 'PREREQ_PM' => {
+							'Digest::SHA1' => 2.0,
+							'MIME::Base64' => 0, 
+							'Crypt::PasswdMD5' => 0, 
+			},
 	);
 } else {
 	WriteMakefile(
@@ -15,7 +20,9 @@ if ($^O !~ /MSWIN/i) {
 	   VERSION_FROM  => 'Htpasswd.pm',
 	   'dist'        => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
 	   'clean'       => { FILES => q[*% *.bak *.old *.test]},
-		 'PREREQ_PM' => {'Crypt::PasswdMD5' => 0},
+		 'PREREQ_PM' => {
+							'Crypt::PasswdMD5' => 0, 
+			},
 	);
 }
 
