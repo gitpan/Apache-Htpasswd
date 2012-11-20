@@ -17,7 +17,7 @@ use Fcntl qw ( LOCK_EX LOCK_UN );
 
 %EXPORT_TAGS = ( all => [@EXPORT_OK] );
 
-$VERSION = '1.8';
+$VERSION = '1.9';
 
 sub Version {
     return $VERSION;
@@ -84,9 +84,9 @@ sub htCheckPassword {
     }
     elsif (index($cryptPass, $SHA1Magic) == 0) {
         # This is an SHA1 password
-        require Digest::SHA1;
+        require Digest::SHA;
         require MIME::Base64;
-        return 1 if '{SHA}'.MIME::Base64::encode_base64( Digest::SHA1::sha1( $pass ), '' ) eq $cryptPass;
+        return 1 if '{SHA}'.MIME::Base64::encode_base64( Digest::SHA::sha1( $pass ), '' ) eq $cryptPass;
     }
 
     # See if it is encrypted using crypt
@@ -97,7 +97,7 @@ sub htCheckPassword {
     
     $self->{'ERROR'} =
         __PACKAGE__ . "::htCheckPassword - Passwords do not match.";
-    carp $self->error() unless caller ne $self;
+    carp $self->error() if caller eq $self;
     return 0;
 }
 
@@ -726,7 +726,7 @@ by running these commands:
 
 If you are going to use MD5 encrypted passwords, you need to install L<Crypt::PasswdMD5>.
 
-If you need to support SHA1 encrypted passwords, you need to install L<Digest::SHA1> and L<MIME::Base64>.
+If you need to support SHA1 encrypted passwords, you need to install L<Digest::SHA> and L<MIME::Base64>.
 
 =head1 DOCUMENTATION
 
@@ -747,6 +747,8 @@ Visit <URL:http://www.perl.com/CPAN/> to find a CPAN
 site near you.
 
 =head1 CHANGES
+
+Revision 1.9.0  SHA dependency changes
 
 Revision 1.8.0  Added proper PREREQ_PM
 
@@ -819,7 +821,7 @@ software, use at your own risk.
 
 =head1 SEE ALSO
 
-L<Apache::Htgroup>, L<Crypt::PasswdMD5>, L<Digest::SHA1>, L<MIME::Base64>
+L<Apache::Htgroup>, L<Crypt::PasswdMD5>, L<Digest::SHA>, L<MIME::Base64>
 
 =cut
 

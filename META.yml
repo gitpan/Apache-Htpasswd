@@ -1,13 +1,23 @@
-# http://module-build.sourceforge.net/META-spec.html
-#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
-name:         Apache-Htpasswd
-version:      1.8
-version_from: Htpasswd.pm
-installdirs:  site
+--- #YAML:1.0
+name:               Apache-Htpasswd
+version:            1.9
+abstract:           ~
+author:  []
+license:            unknown
+distribution_type:  module
+configure_requires:
+    ExtUtils::MakeMaker:  0
+build_requires:
+    ExtUtils::MakeMaker:  0
 requires:
-    Crypt::PasswdMD5:              0
-    Digest::SHA1:                  2
-    MIME::Base64:                  0
-
-distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.30
+    Crypt::PasswdMD5:  0
+    Digest::SHA:       2
+    MIME::Base64:      0
+no_index:
+    directory:
+        - t
+        - inc
+generated_by:       ExtUtils::MakeMaker version 6.56
+meta-spec:
+    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
+    version:  1.4

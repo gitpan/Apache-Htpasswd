@@ -115,9 +115,9 @@ close TEST;
         }
 
 	# 19: check whether SHA1 passwords work
-        eval { require Digest::MD5; require MIME::Base64 };
+        eval { require Digest::SHA; require MIME::Base64 };
         if ($@) {
-            &report_skip('Digest::MD5 and MIME::Base64 required for this test');
+            &report_skip('Digest::SHA and MIME::Base64 required for this test');
         } else {
             &report_result($pwdFile->htCheckPassword("SHA1user","123"),$!);
         }
